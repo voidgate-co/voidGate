@@ -49,12 +49,10 @@ static int
 libbpf_print(enum libbpf_print_level level, const char *fmt,
     va_list args)
 {
-    if (vg_verbose >= 2) {
-        if (level > LIBBPF_INFO) {
-            return 0;
-        }
+    enum libbpf_print_level max_level =
+        vg_verbose >= 2 ? LIBBPF_INFO : LIBBPF_WARN;
 
-    } else if (level > LIBBPF_WARN) {
+    if (level > max_level) {
         return 0;
     }
 
@@ -78,6 +76,13 @@ vg_maps_open(struct vg_maps *m, struct vg_config_file *cfg)
     int err;
 
     memset(m, 0, sizeof(*m));
+
+    m->ifindex = (int) if_nametoindex(cfg->interface);
+
+    if (m->ifindex == 0) {
+        vg_die("unknown interface %s", cfg->interface);
+    }
+
     bump_memlock();
     libbpf_set_print(libbpf_print);
 
@@ -87,6 +92,7 @@ vg_maps_open(struct vg_maps *m, struct vg_config_file *cfg)
         m->ncpus = 1;
     }
 
+    /* Reuse one buffer sized for either counter type across all CPUs. */
     m->sum_scratch_size = sum_scratch_need(m->ncpus);
     m->sum_scratch = calloc(1, m->sum_scratch_size);
 
@@ -120,16 +126,6 @@ vg_maps_open(struct vg_maps *m, struct vg_config_file *cfg)
         free(m->sum_scratch);
         m->sum_scratch = NULL;
         vg_die("failed to load BPF object: %d", err);
-    }
-
-    m->ifindex = (int) if_nametoindex(cfg->interface);
-
-    if (m->ifindex == 0) {
-        voidgate_bpf__destroy(m->skel);
-        m->skel = NULL;
-        free(m->sum_scratch);
-        m->sum_scratch = NULL;
-        vg_die("unknown interface %s", cfg->interface);
     }
 
     return 0;

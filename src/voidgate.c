@@ -95,7 +95,7 @@ main(int argc, char **argv)
     }
 
     if (vg_config_load(cfg_path, &cfg) < 0) {
-        vg_die("config %s", cfg_path);
+        vg_die("failed to load config %s", cfg_path);
     }
 
     if (iface_ov != NULL) {
