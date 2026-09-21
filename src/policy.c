@@ -565,10 +565,6 @@ tick_dt(struct vg_ctrl *c)
          + (double) (now.tv_nsec - c->last_tick.tv_nsec) / 1e9;
     c->last_tick = now;
 
-    if (dt < 0) {
-        dt = 0;
-    }
-
     return dt;
 }
 
