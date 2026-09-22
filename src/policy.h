@@ -56,7 +56,6 @@ int vg_ctrl_disarm(struct vg_ctrl *c, const char *why);
 int vg_ctrl_tick(struct vg_ctrl *c);
 int vg_ctrl_drop(struct vg_ctrl *c, const struct vg_cidr *p, uint32_t reason);
 int vg_ctrl_undrop(struct vg_ctrl *c, const struct vg_cidr *p);
-int vg_ctrl_reload(struct vg_ctrl *c);
 
 #if (VG_CTRL_TEST)
 unsigned vg_ctrl_snap_count(const struct vg_ctrl *c);

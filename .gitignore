@@ -2,7 +2,6 @@ voidgate
 voidgatectl
 tests/test_xdp
 tests/test_ctrl
-tests/test_ctl
 *.o
 *.d
 *~

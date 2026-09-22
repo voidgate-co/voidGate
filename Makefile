@@ -28,9 +28,9 @@ USER_OBJS := src/voidgate.o src/config.o src/policy.o src/maps.o src/ipaddr.o \
 CTL_OBJS  := src/voidgatectl.o
 TEST_OBJS := tests/test_xdp.o src/ipaddr.o src/config.o src/log.o
 
-.PHONY: all clean install install-lua test test-ctl test-lua
+.PHONY: all clean install install-lua test test-lua
 
-all: voidgate voidgatectl tests/test_xdp tests/test_policy tests/test_ctl
+all: voidgate voidgatectl tests/test_xdp tests/test_policy
 
 $(BPFDIR)/voidgate.bpf.o: $(BPFDIR)/voidgate.bpf.c $(BPFDIR)/voidgate.h
 	$(CLANG) $(BPF_CFLAGS) -c $< -o $@
@@ -65,31 +65,22 @@ tests/test_policy: tests/test_policy.c src/policy.c src/policy.h \
 		tests/test_policy.c src/policy.c src/config.o src/ipaddr.o \
 		src/log.o
 
-tests/test_ctl: tests/test_ctl.c src/ctl_server.c src/ctl_server.h \
-	src/policy.h src/maps.h src/config.h src/ipaddr.h $(BPFDIR)/voidgate.h \
-	src/ipaddr.o
-	$(CC) $(CFLAGS) -MF tests/test_ctl.d -o $@ tests/test_ctl.c \
-		src/ctl_server.c src/ipaddr.o -Wl,--wrap=read -Wl,--wrap=send
+test-lua: voidgate
+	sudo python3 tests/test_lua.py "$(LUA)" ./voidgate
 
-test-ctl: tests/test_ctl
-	./tests/test_ctl
-
-test-lua: tests/test_ctl
-	python3 tests/test_lua.py "$(LUA)" ./tests/test_ctl
-
-test: tests/test_xdp tests/test_policy test-ctl
+test: voidgatectl tests/test_xdp tests/test_policy test-lua
 	./tests/test_policy
 	sudo ./tests/test_xdp
 	sudo tests/test_netns.sh
 
 clean:
-	rm -f voidgate voidgatectl tests/test_xdp tests/test_policy tests/test_ctl \
+	rm -f voidgate voidgatectl tests/test_xdp tests/test_policy \
 		src/*.o src/*.d tests/*.o tests/*.d \
 		$(BPFDIR)/voidgate.bpf.o $(BPFDIR)/voidgate.bpf.d \
 		$(BPFDIR)/voidgate.skel.h
 
 -include $(USER_OBJS:.o=.d) $(CTL_OBJS:.o=.d) tests/test_xdp.d \
-	tests/test_policy.d tests/test_ctl.d $(BPFDIR)/voidgate.bpf.d
+	tests/test_policy.d $(BPFDIR)/voidgate.bpf.d
 
 install: all
 	install -d $(DESTDIR)$(PREFIX)/sbin

@@ -344,53 +344,6 @@ vg_ctrl_disarm(struct vg_ctrl *c, const char *why)
 }
 
 
-int
-vg_ctrl_reload(struct vg_ctrl *c)
-{
-    struct vg_config_file n;
-    char iface[VG_MAX_IFACE];
-    char mode[16];
-    uint32_t rsz, dsz;
-
-    if (c->cfg_path[0] == '\0') {
-        return -1;
-    }
-
-    snprintf(iface, sizeof(iface), "%s", c->cfg->interface);
-    snprintf(mode, sizeof(mode), "%s", c->cfg->xdp_mode);
-    rsz = c->cfg->remote_map_size;
-    dsz = c->cfg->drop_map_size;
-
-    if (vg_config_load(c->cfg_path, &n) < 0) {
-        return -1;
-    }
-
-    snprintf(n.interface, sizeof(n.interface), "%s", iface);
-    snprintf(n.xdp_mode, sizeof(n.xdp_mode), "%s", mode);
-    n.remote_map_size = rsz;
-    n.drop_map_size = dsz;
-
-    if (c->iface_override[0]) {
-        snprintf(n.interface, sizeof(n.interface), "%s", c->iface_override);
-    }
-
-    *c->cfg = n;
-
-    if (vg_cfg_commit(c->maps, c->state == VG_ACTIVE, c->cfg) < 0) {
-        return -1;
-    }
-
-    if (vg_populate_allow(c->maps, c->cfg) < 0
-        || vg_populate_local(c->maps, c->cfg) < 0)
-    {
-        return -1;
-    }
-
-    vg_log("reloaded %s", c->cfg_path);
-    return 0;
-}
-
-
 static int
 maybe_aggregate(struct vg_ctrl *c, const struct vg_cidr *host)
 {
