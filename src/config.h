@@ -16,6 +16,7 @@
 struct vg_config_file {
     char              interface[VG_MAX_IFACE];
     char              xdp_mode[16]; /* auto, native, skb */
+    char              log_file[VG_CFG_PATH_MAX];
     uint64_t          wake_pps;
     uint64_t          wake_mbps;
     int               idle_poll_ms;

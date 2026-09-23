@@ -40,6 +40,8 @@ static const struct cfg_scalar scalars[] = {
       sizeof(((struct vg_config_file *) NULL)->interface) },
     { "xdp_mode", CFG_STR, CFG_OFF(xdp_mode),
       sizeof(((struct vg_config_file *) NULL)->xdp_mode) },
+    { "log_file", CFG_STR, CFG_OFF(log_file),
+      sizeof(((struct vg_config_file *) NULL)->log_file) },
     { "wake_pps", CFG_U64, CFG_OFF(wake_pps), 0 },
     { "wake_mbps", CFG_U64, CFG_OFF(wake_mbps), 0 },
     { "idle_poll_ms", CFG_I32, CFG_OFF(idle_poll_ms), 0 },
@@ -60,6 +62,7 @@ vg_config_defaults(struct vg_config_file *c)
     memset(c, 0, sizeof(*c));
     snprintf(c->interface, sizeof(c->interface), "eth0");
     snprintf(c->xdp_mode, sizeof(c->xdp_mode), "auto");
+    snprintf(c->log_file, sizeof(c->log_file), "/var/log/voidgate.log");
     c->wake_pps = 2000;
     c->wake_mbps = 25;
     c->idle_poll_ms = 1000;
@@ -201,6 +204,10 @@ apply_scalar(struct vg_config_file *c, const struct cfg_scalar *s,
 {
     switch (s->kind) {
     case CFG_STR:
+        if (s->sz == 0 || *val == '\0' || strlen(val) >= s->sz) {
+            return -1;
+        }
+
         snprintf((char *) c + s->off, s->sz, "%s", val);
         return 0;
     case CFG_U64: {
@@ -290,8 +297,7 @@ vg_config_load(const char *path, struct vg_config_file *c)
 
             if (apply_scalar(c, &scalars[i], val) < 0) {
                 vg_warn("%s:%d: bad value for %s", path, lineno, key);
-                fclose(fp);
-                return -1;
+                goto fail;
             }
 
             found = 1;
@@ -304,8 +310,7 @@ vg_config_load(const char *path, struct vg_config_file *c)
 
         if (strcmp(key, "allow_ports") == 0) {
             if (parse_allow_ports(val, c) < 0) {
-                fclose(fp);
-                return -1;
+                goto fail;
             }
 
         } else if (strcmp(key, "local_networks") == 0) {
@@ -315,8 +320,7 @@ vg_config_load(const char *path, struct vg_config_file *c)
                 if (parse_csv_cidrs(val, c->local_cidr, &c->local_cidr_count,
                                     VG_MAX_CIDR_LIST) < 0)
                 {
-                    fclose(fp);
-                    return -1;
+                    goto fail;
                 }
             }
 
@@ -325,8 +329,7 @@ vg_config_load(const char *path, struct vg_config_file *c)
                 if (parse_csv_cidrs(val, c->allow_cidr, &c->allow_cidr_count,
                                     VG_MAX_CIDR_LIST) < 0)
                 {
-                    fclose(fp);
-                    return -1;
+                    goto fail;
                 }
             }
 
@@ -341,6 +344,10 @@ vg_config_load(const char *path, struct vg_config_file *c)
     }
 
     return 0;
+
+fail:
+    fclose(fp);
+    return -1;
 }
 
 

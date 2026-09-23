@@ -196,6 +196,7 @@ vg_ctrl_reload(struct vg_ctrl *c)
     struct vg_config_file  n;
     char                   iface[VG_MAX_IFACE];
     char                   mode[16];
+    char                   log_file[VG_CFG_PATH_MAX];
 
     if (c->cfg_path[0] == '\0') {
         return -1;
@@ -203,6 +204,7 @@ vg_ctrl_reload(struct vg_ctrl *c)
 
     snprintf(iface, sizeof(iface), "%s", c->cfg->interface);
     snprintf(mode, sizeof(mode), "%s", c->cfg->xdp_mode);
+    snprintf(log_file, sizeof(log_file), "%s", c->cfg->log_file);
     rsz = c->cfg->remote_map_size;
     dsz = c->cfg->drop_map_size;
 
@@ -212,6 +214,7 @@ vg_ctrl_reload(struct vg_ctrl *c)
 
     snprintf(n.interface, sizeof(n.interface), "%s", iface);
     snprintf(n.xdp_mode, sizeof(n.xdp_mode), "%s", mode);
+    snprintf(n.log_file, sizeof(n.log_file), "%s", log_file);
     n.remote_map_size = rsz;
     n.drop_map_size = dsz;
 

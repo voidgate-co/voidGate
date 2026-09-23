@@ -47,6 +47,31 @@ sudo ./voidgatectl disarm
 
 Prometheus: `http://127.0.0.1:9105/metrics`
 
+Use `-d` to detach and run in the background:
+
+```sh
+sudo ./voidgate -d -c configs/voidgate.conf
+# Stop using the PID printed after successful startup:
+sudo kill -TERM <pid>
+```
+
+The command waits for startup before returning success and printing the daemon
+PID to stderr. Startup failures return nonzero; after detachment, diagnostic
+details are in the log file. SIGTERM shuts down the daemon and detaches XDP.
+The supplied systemd service continues running in the foreground.
+
+`log_file` in the configuration selects the append-only log. Omit the key for
+`/var/log/voidgate.log`. Files are created with mode `0640` subject to
+the process umask; parent directories must already exist. Relative log and
+config paths use the launch directory, which the daemon retains for
+configuration reloads. `-v` and `-vv` retain their usual verbosity. Restart
+voidgate after rotating the log file or changing its destination; configuration
+reload does not reopen logs.
+
+Run `make test-daemon` to test daemon startup and logging in isolated mount,
+network and PID namespaces (requires sudo and BPF support). It is included in
+`make test`.
+
 Edit `interface` in the config to the VM's public NIC. Do not point this
 at a shared management-only interface you cannot afford to XDP-attach;
 the idle path is `XDP_PASS`, but attach still requires driver/SKB XDP.
