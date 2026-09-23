@@ -68,6 +68,7 @@ start_daemon() {
     [[ $message =~ ^voidgate\ daemon\ started\ \(pid\ ([0-9]+)\)$ ]]
     pid=${BASH_REMATCH[1]}
     kill -0 "$pid"
+    [[ $(< /run/voidgate.pid) == "$pid" ]]
     status
     [[ $(readlink "/proc/$pid/fd/0") == /dev/null ]]
     [[ $(readlink "/proc/$pid/fd/1") == /dev/null ]]
@@ -82,18 +83,11 @@ start_daemon() {
 }
 
 stop_daemon() {
-    kill -TERM "$pid"
-    local attempt
-    for attempt in {1..100}; do
-        if [[ ! -e /run/voidgate.sock ]]; then
-            break
-        fi
-        sleep 0.05
-    done
+    "$root/voidgate" -s stop -c base.conf
     [[ ! -e /run/voidgate.sock ]]
+    [[ ! -e /run/voidgate.pid ]]
     # An XDP program must no longer be attached after socket removal.
     [[ $(ip -details link show test0) != *prog/xdp* ]]
-    wait "$pid" 2>/dev/null || true
     pid=
 }
 
@@ -104,6 +98,8 @@ expect_failure() {
     [[ ! -e /run/voidgate.sock ]]
     [[ $(ip -details link show test0) != *prog/xdp* ]]
 }
+
+expect_failure "$root/voidgate" -s stop -c base.conf
 
 # Default daemon log, permissions and append across restarts.
 start_daemon -c base.conf

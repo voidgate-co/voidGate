@@ -51,8 +51,7 @@ Use `-d` to detach and run in the background:
 
 ```sh
 sudo ./voidgate -d -c configs/voidgate.conf
-# Stop using the PID printed after successful startup:
-sudo kill -TERM <pid>
+sudo ./voidgate -s stop
 ```
 
 The command waits for startup before returning success and printing the daemon
@@ -62,11 +61,12 @@ The supplied systemd service continues running in the foreground.
 
 `log_file` in the configuration selects the append-only log. Omit the key for
 `/var/log/voidgate.log`. Files are created with mode `0640` subject to
-the process umask; parent directories must already exist. Relative log and
+the process umask; parent directories must already exist. `pid_file` is
+`/run/voidgate.pid` when omitted; `-s stop` reads it. Relative log, pid, and
 config paths use the launch directory, which the daemon retains for
 configuration reloads. `-v` and `-vv` retain their usual verbosity. Restart
 voidgate after rotating the log file or changing its destination; configuration
-reload does not reopen logs.
+reload does not reopen logs or move the pid file.
 
 Run `make test-daemon` to test daemon startup and logging in isolated mount,
 network and PID namespaces (requires sudo and BPF support). It is included in

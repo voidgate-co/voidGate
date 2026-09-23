@@ -30,6 +30,8 @@ static long elapsed_ms(const struct timespec *a, const struct timespec *b);
 static void usage(const char *argv0);
 static void redirect_log(int fd);
 static int daemon_start(int log_fd);
+static void write_pidfile(const char *path);
+static void daemon_stop(const char *path);
 
 static volatile sig_atomic_t g_stop;
 
@@ -63,7 +65,7 @@ static void
 usage(const char *argv0)
 {
     fprintf(stderr,
-            "usage: %s [-d] [-c config] [-i iface] [-v|-vv]\n",
+            "usage: %s [-d] [-s stop] [-c config] [-i iface] [-v|-vv]\n",
             argv0);
 }
 
@@ -166,6 +168,85 @@ daemon_start(int log_fd)
 }
 
 
+static void
+write_pidfile(const char *path)
+{
+    char buf[32];
+    int fd, n;
+
+    fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+
+    if (fd < 0) {
+        vg_die("open pid file %s: %s", path, strerror(errno));
+    }
+
+    n = snprintf(buf, sizeof(buf), "%ld\n", (long) getpid());
+
+    if (write(fd, buf, (size_t) n) != n) {
+        close(fd);
+        unlink(path);
+        vg_die("write pid file %s: %s", path, strerror(errno));
+    }
+
+    close(fd);
+}
+
+
+static void
+daemon_stop(const char *path)
+{
+    char buf[32];
+    struct timespec delay = { .tv_sec = 0, .tv_nsec = 50 * 1000 * 1000 };
+    ssize_t n;
+    long pid;
+    int fd, i;
+
+    fd = open(path, O_RDONLY);
+
+    if (fd < 0) {
+        vg_die("open pid file %s: %s", path, strerror(errno));
+    }
+
+    n = read(fd, buf, sizeof(buf) - 1);
+    close(fd);
+
+    if (n <= 0) {
+        vg_die("read pid file %s: %s", path,
+               n < 0 ? strerror(errno) : "empty");
+    }
+
+    buf[n] = '\0';
+    pid = strtol(buf, NULL, 10);
+
+    if (pid <= 0) {
+        vg_die("bad pid file %s", path);
+    }
+
+    if (kill((pid_t) pid, SIGTERM) < 0) {
+        if (errno == ESRCH) {
+            unlink(path);
+        }
+
+        vg_die("stop pid %ld: %s", pid, strerror(errno));
+    }
+
+    for (i = 0; i < 200; i++) {
+        if (kill((pid_t) pid, 0) < 0) {
+            if (errno == ESRCH) {
+                unlink(path);
+                return;
+            }
+
+            vg_die("stop pid %ld: %s", pid, strerror(errno));
+        }
+
+        nanosleep(&delay, NULL);
+    }
+
+    vg_die("stop pid %ld: timed out", pid);
+}
+
+
 int
 main(int argc, char **argv)
 {
@@ -175,11 +256,11 @@ main(int argc, char **argv)
     const char *cfg_path = "/etc/voidgate/voidgate.conf";
     const char *iface_ov = NULL;
     int opt, ctl_fd = -1, http_fd = -1;
-    int daemon_mode = 0, log_fd, ready_fd = -1, result = 0;
+    int daemon_mode = 0, stop_mode = 0, log_fd, ready_fd = -1, result = 0;
     struct sigaction sa;
     struct timespec last_tick;
 
-    while ((opt = getopt(argc, argv, "c:i:dhv")) != -1) {
+    while ((opt = getopt(argc, argv, "c:i:ds:hv")) != -1) {
         switch (opt) {
         case 'c':
             cfg_path = optarg;
@@ -195,6 +276,14 @@ main(int argc, char **argv)
         case 'd':
             daemon_mode = 1;
             break;
+        case 's':
+            if (strcmp(optarg, "stop") != 0) {
+                usage(argv[0]);
+                return 1;
+            }
+
+            stop_mode = 1;
+            break;
         default:
             usage(argv[0]);
             return 1;
@@ -203,6 +292,11 @@ main(int argc, char **argv)
 
     if (vg_config_load(cfg_path, &cfg) < 0) {
         vg_die("failed to load config %s", cfg_path);
+    }
+
+    if (stop_mode) {
+        daemon_stop(cfg.pid_file);
+        return 0;
     }
 
     if (iface_ov != NULL) {
@@ -278,6 +372,8 @@ main(int argc, char **argv)
     vg_log("idle on %s, wake_pps=%llu wake_mbps=%llu", cfg.interface,
            (unsigned long long)cfg.wake_pps,
            (unsigned long long)cfg.wake_mbps);
+
+    write_pidfile(cfg.pid_file);
 
     if (ready_fd >= 0) {
         pid_t daemon_pid = getpid();
@@ -370,6 +466,8 @@ main(int argc, char **argv)
     vg_ctrl_disarm(&ctrl, "shutdown");
     vg_ctrl_free(&ctrl);
     vg_maps_close(&maps);
+
+    unlink(cfg.pid_file);
 
     if (ctl_fd >= 0) {
         close(ctl_fd);
