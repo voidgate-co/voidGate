@@ -3,7 +3,6 @@ CC      ?= gcc
 CLANG   ?= clang
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
-LUA     ?= lua
 LUA_VERSION ?= 5.4
 LUA_DIR ?= $(PREFIX)/share/lua/$(LUA_VERSION)
 
@@ -28,7 +27,7 @@ USER_OBJS := src/voidgate.o src/config.o src/policy.o src/maps.o src/ipaddr.o \
 CTL_OBJS  := src/voidgatectl.o
 TEST_OBJS := tests/test_xdp.o src/ipaddr.o src/config.o src/log.o
 
-.PHONY: all clean install install-lua test test-lua test-daemon
+.PHONY: all clean install install-lua
 
 all: voidgate voidgatectl tests/test_xdp tests/test_policy
 
@@ -64,17 +63,6 @@ tests/test_policy: tests/test_policy.c src/policy.c src/policy.h \
 	$(CC) $(CFLAGS) -DVG_CTRL_TEST -MF tests/test_policy.d -o $@ \
 		tests/test_policy.c src/policy.c src/config.o src/ipaddr.o \
 		src/log.o
-
-test-lua: voidgate voidgatectl
-	bash tests/test_lua.sh "$(LUA)"
-
-test-daemon: voidgate voidgatectl
-	bash tests/test_daemon.sh
-
-test: voidgatectl tests/test_xdp tests/test_policy test-lua test-daemon
-	./tests/test_policy
-	sudo ./tests/test_xdp
-	sudo tests/test_netns.sh
 
 clean:
 	rm -f voidgate voidgatectl tests/test_xdp tests/test_policy \

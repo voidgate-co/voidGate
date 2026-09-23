@@ -68,9 +68,8 @@ configuration reloads. `-v` and `-vv` retain their usual verbosity. Restart
 voidgate after rotating the log file or changing its destination; configuration
 reload does not reopen logs or move the pid file.
 
-Run `make test-daemon` to test daemon startup and logging in isolated mount,
-network and PID namespaces (requires sudo and BPF support). It is included in
-`make test`.
+Run `sudo bash tests/test_daemon.sh` to test daemon startup and logging in
+isolated mount, network and PID namespaces (requires sudo and BPF support).
 
 Edit `interface` in the config to the VM's public NIC. Do not point this
 at a shared management-only interface you cannot afford to XDP-attach;
@@ -141,16 +140,13 @@ Run the Lua control tests against an isolated real daemon (requires sudo,
 BPF support, Bash, coreutils, iproute2, util-linux, Lua, and LuaSocket):
 
 ```sh
-make test-lua LUA=lua5.4
+sudo bash tests/test_lua.sh
 ```
 
 The Bash runner creates private network and mount namespaces, a temporary
 veth pair, and a private `/run/voidgate.sock`. It stops the daemon and removes
-temporary files after the test. After building both binaries, it can also
-be run directly with `bash tests/test_lua.sh lua5.4`. `make test` includes
-this test.
-`LUA` accepts an interpreter followed by whitespace-separated arguments
-(for example, `LUA="lua5.4 -E"`); shell quoting within that value is not parsed.
+temporary files after the test. Build `voidgate` and `voidgatectl` first.
+The runner uses `lua` from `PATH`.
 
 ## How it decides
 

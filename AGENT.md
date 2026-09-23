@@ -97,9 +97,11 @@ LPM lookup key prefixlen is 32/128 for a host query. LPM_TRIE maps need
 
 ```
 make
+./tests/test_policy
 sudo ./tests/test_xdp
 sudo tests/test_netns.sh
-# or: sudo make test
+sudo bash tests/test_daemon.sh
+sudo bash tests/test_lua.sh
 ```
 
 Needs clang, llvm, libbpf, bpftool, libelf, root (or `CAP_BPF` +
