@@ -2,23 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # Exercise real daemon startup in disposable mount, network and PID namespaces.
 set -euo pipefail
+. "$(dirname "$0")/create_env.sh"
 
-if [[ ${1:-} != --isolated ]]; then
-    exec sudo unshare --mount --net --pid --fork --kill-child \
-        --propagation private bash "$0" --isolated \
-        "$(readlink /proc/self/ns/mnt)"
-fi
-if [[ -z ${2:-} || $(readlink /proc/self/ns/mnt) == "$2" ||
-      $(readlink /proc/self/ns/mnt) == $(readlink /proc/1/ns/mnt) ]]; then
-    echo "refusing to run without mount isolation" >&2
-    exit 1
-fi
-
-root=$(cd "$(dirname "$0")/.." && pwd)
-mount -t proc proc /proc
-mount -t tmpfs -o mode=755 tmpfs /run
-mount -t tmpfs -o mode=755 tmpfs /var/log
-directory=$(mktemp -d /tmp/voidgate-daemon-XXXXXX)
+directory=$(mktemp -d /tmp/voidgate-XXXXXX)
 pid=
 
 cleanup() {
@@ -38,13 +24,11 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-ip link add test0 type veth peer name peer0
-for interface in lo test0 peer0; do
-    ip link set "$interface" up
-done
 cd "$directory"
 umask 022
 cp "$root/tests/idle.conf" base.conf
+mkdir "$work/log"
+printf 'log_file = %s\n' "$work/log/voidgate.log" >> base.conf
 
 status() {
     [[ $(timeout 2 "$root/voidgatectl" status) == state=idle* ]]
@@ -94,12 +78,12 @@ expect_failure "$root/voidgate" -s stop -c base.conf
 
 # Default daemon log, permissions and append across restarts.
 start_daemon -c base.conf
-[[ $(readlink "/proc/$pid/fd/2") == /var/log/voidgate.log ]]
-[[ $(stat -c %a /var/log/voidgate.log) == 640 ]]
+[[ $(readlink "/proc/$pid/fd/2") == "$work/log/voidgate.log" ]]
+[[ $(stat -c %a "$work/log/voidgate.log") == 640 ]]
 stop_daemon
-printf 'append marker\n' >> /var/log/voidgate.log
+printf 'append marker\n' >> "$work/log/voidgate.log"
 start_daemon -c base.conf
-grep -q 'append marker' /var/log/voidgate.log
+grep -q 'append marker' "$work/log/voidgate.log"
 stop_daemon
 
 # Configured relative destination, verbosity and relative config reload.
@@ -140,7 +124,7 @@ for mode in default config; do
     status
     [[ ! -s foreground.err ]]
     if [[ $mode == default ]]; then
-        grep -q 'idle on test0' /var/log/voidgate.log
+        grep -q 'idle on test0' "$work/log/voidgate.log"
     else
         grep -q 'idle on test0' "foreground-$mode.log"
     fi
