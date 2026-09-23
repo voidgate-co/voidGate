@@ -44,16 +44,7 @@ for interface in lo test0 peer0; do
 done
 cd "$directory"
 umask 022
-cat > base.conf <<'CONF'
-interface = test0
-xdp_mode = skb
-wake_pps = 1000000000
-wake_mbps = 1000000000
-metrics_port = 0
-remote_map_size = 64
-drop_map_size = 64
-local_networks = 198.51.100.10/32,2001:db8:1::10/128
-CONF
+cp "$root/tests/idle.conf" base.conf
 
 status() {
     [[ $(timeout 2 "$root/voidgatectl" status) == state=idle* ]]

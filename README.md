@@ -138,15 +138,19 @@ text response and connection close. Commands are limited to 254 bytes before
 the newline. The server also accepts a command terminated by a write-side EOF.
 
 Run the Lua control tests against an isolated real daemon (requires sudo,
-BPF support, iproute2, util-linux, Python 3, Lua, and LuaSocket):
+BPF support, Bash, coreutils, iproute2, util-linux, Lua, and LuaSocket):
 
 ```sh
 make test-lua LUA=lua5.4
 ```
 
-The runner creates private network and mount namespaces, a temporary veth
-pair, and a private `/run/voidgate.sock`. It stops the daemon and removes
-the temporary setup after the test. `make test` includes this test.
+The Bash runner creates private network and mount namespaces, a temporary
+veth pair, and a private `/run/voidgate.sock`. It stops the daemon and removes
+temporary files after the test. After building both binaries, it can also
+be run directly with `bash tests/test_lua.sh lua5.4`. `make test` includes
+this test.
+`LUA` accepts an interpreter followed by whitespace-separated arguments
+(for example, `LUA="lua5.4 -E"`); shell quoting within that value is not parsed.
 
 ## How it decides
 

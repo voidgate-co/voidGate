@@ -65,8 +65,8 @@ tests/test_policy: tests/test_policy.c src/policy.c src/policy.h \
 		tests/test_policy.c src/policy.c src/config.o src/ipaddr.o \
 		src/log.o
 
-test-lua: voidgate
-	sudo python3 tests/test_lua.py "$(LUA)" ./voidgate
+test-lua: voidgate voidgatectl
+	bash tests/test_lua.sh "$(LUA)"
 
 test-daemon: voidgate voidgatectl
 	bash tests/test_daemon.sh
