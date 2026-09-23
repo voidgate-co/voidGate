@@ -19,7 +19,6 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/time.h>
-#include <sys/wait.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -91,15 +90,6 @@ daemon_start(int log_fd)
     pid_t    child, daemon_pid;
     ssize_t  n;
 
-    /* Keep pipe descriptors above stderr even if the caller closed stdio. */
-    for (fd = STDIN_FILENO; fd <= STDERR_FILENO; fd++) {
-        if (fcntl(fd, F_GETFD) < 0) {
-            if (errno != EBADF || open("/dev/null", O_RDWR) < 0) {
-                vg_die("reserve standard streams: %s", strerror(errno));
-            }
-        }
-    }
-
     if (pipe(pipefd) < 0) {
         vg_die("startup pipe: %s", strerror(errno));
     }
@@ -114,8 +104,6 @@ daemon_start(int log_fd)
     if (child > 0) {
         close(pipefd[1]);
         close(log_fd);
-
-        while (waitpid(child, NULL, 0) < 0 && errno == EINTR) { /* void */ }
 
         do {
             n = read(pipefd[0], &daemon_pid, sizeof(daemon_pid));
@@ -137,16 +125,6 @@ daemon_start(int log_fd)
 
     if (setsid() < 0) {
         vg_die("setsid: %s", strerror(errno));
-    }
-
-    child = fork();
-
-    if (child < 0) {
-        vg_die("fork: %s", strerror(errno));
-    }
-
-    if (child > 0) {
-        _exit(0);
     }
 
     fd = open("/dev/null", O_RDWR);

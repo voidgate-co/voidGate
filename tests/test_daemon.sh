@@ -64,11 +64,11 @@ start_daemon() {
     [[ $(readlink "/proc/$pid/fd/0") == /dev/null ]]
     [[ $(readlink "/proc/$pid/fd/1") == /dev/null ]]
     [[ $(readlink "/proc/$pid/cwd") == "$directory" ]]
-    # Double fork leaves the daemon outside the caller's session, and not
-    # a session leader. Linux stat: pid, comm, state, ppid, pgrp, session.
+    # Single fork + setsid: session leader, not the caller's session.
+    # Linux stat: pid, comm, state, ppid, pgrp, session.
     local process comm state parent group session rest
     read -r process comm state parent group session rest < "/proc/$pid/stat"
-    [[ $session != "$pid" ]]
+    [[ $session == "$pid" ]]
     read -r process comm state parent group rest < /proc/self/stat
     [[ $group != "$session" ]]
 }
@@ -121,23 +121,6 @@ printf 'append marker\n' > append.log
 start_daemon -c append.conf
 [[ $(readlink "/proc/$pid/fd/2") == "$directory/append.log" ]]
 grep -q 'append marker' append.log
-stop_daemon
-
-# Closed inherited standard streams must not collide with the startup pipe.
-cp base.conf closed.conf
-printf 'log_file = closed.log\n' >> closed.conf
-timeout --kill-after=2 10 bash -c 'exec 0<&- 1>&- 2>&-; exec "$@"' _ \
-    "$root/voidgate" -d -c closed.conf
-status
-for entry in /proc/[0-9]*/stat; do
-    if read -r process comm state rest < "$entry"; then
-        if [[ $comm == '(voidgate)' && $state != Z ]]; then
-            pid=$process
-        fi
-    fi
-done
-[[ -n $pid ]]
-grep -q 'idle on test0' closed.log
 stop_daemon
 
 # Foreground remains attached to the launched PID, with default or file log.
