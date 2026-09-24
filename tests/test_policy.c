@@ -76,7 +76,7 @@ vg_populate_allow(struct vg_maps *m, const struct vg_config *cfg)
 
 
 int
-vg_populate_local(struct vg_maps *m, struct vg_config *cfg)
+vg_populate_local(struct vg_maps *m, const struct vg_config *cfg)
 {
     (void) m;
     (void) cfg;

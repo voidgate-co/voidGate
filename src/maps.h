@@ -51,7 +51,7 @@ int vg_drop_add(struct vg_maps *m, const struct vg_cidr *p, uint32_t reason,
 int vg_drop_del(struct vg_maps *m, const struct vg_cidr *p);
 int vg_drop_flush(struct vg_maps *m);
 
-int vg_populate_local(struct vg_maps *m, struct vg_config *cfg);
+int vg_populate_local(struct vg_maps *m, const struct vg_config *cfg);
 int vg_populate_allow(struct vg_maps *m, const struct vg_config *cfg);
 
 int vg_maps_metrics_fd(struct vg_maps *m);

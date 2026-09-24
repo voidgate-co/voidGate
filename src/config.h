@@ -41,6 +41,7 @@ struct vg_config {
 
 void vg_config_defaults(struct vg_config *c);
 int vg_config_load(const char *path, struct vg_config *c);
+int vg_config_auto_local(struct vg_config *c);
 int vg_cidr_is_protected(const struct vg_config *cfg,
     const struct vg_cidr *p);
 

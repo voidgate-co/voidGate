@@ -225,6 +225,10 @@ vg_ctrl_reload(struct vg_ctrl *c)
         snprintf(n.interface, sizeof(n.interface), "%s", c->iface_override);
     }
 
+    if (vg_config_auto_local(&n) < 0) {
+        return -1;
+    }
+
     *c->cfg = n;
 
     if (vg_cfg_commit(c->maps, c->state == VG_ACTIVE, c->cfg) < 0) {

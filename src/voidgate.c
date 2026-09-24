@@ -285,6 +285,10 @@ main(int argc, char **argv)
         vg_die("unknown interface %s", cfg.interface);
     }
 
+    if (vg_config_auto_local(&cfg) < 0) {
+        vg_die("failed to read addresses on %s", cfg.interface);
+    }
+
     log_fd = open(cfg.log_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
 
     if (log_fd < 0) {

@@ -6,16 +6,12 @@
 
 #include "bpf/voidgate.skel.h"
 
-#include <arpa/inet.h>
 #include <bpf/bpf.h>
 #include <bpf/libbpf.h>
 #include <errno.h>
 #include <stdarg.h>
-#include <ifaddrs.h>
 #include <linux/if_link.h>
 #include <net/if.h>
-#include <netinet/in.h>
-#include <sys/socket.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/resource.h>
@@ -31,8 +27,6 @@ static int foreach_family(struct vg_maps *m, int fd, int family, size_t ksz,
 static int lpm_update(int fd, const struct vg_cidr *p, const void *val);
 static int lpm_delete(int fd, const struct vg_cidr *p);
 static int flush_lpm(int fd, int v6);
-static int local_cidr_from_nic(const char *nic, struct vg_cidr *out,
-    int max);
 
 static void
 bump_memlock(void)
@@ -481,79 +475,11 @@ vg_drop_flush(struct vg_maps *m)
 }
 
 
-/* This VM's addresses as host CIDRs (/32, /128). The on-link netmask
- * is not used: a neighbor on the same LAN is not local.
- */
-static int
-local_cidr_from_nic(const char *nic, struct vg_cidr *out, int max)
-{
-    struct ifaddrs *ifa, *p;
-    int n = 0;
-
-    if (getifaddrs(&ifa) < 0) {
-        vg_warn("getifaddrs failed: %s", strerror(errno));
-        return -1;
-    }
-
-    for (p = ifa; p != NULL && n < max; p = p->ifa_next) {
-        if (p->ifa_addr == NULL || p->ifa_name == NULL
-            || strcmp(p->ifa_name, nic) != 0)
-        {
-            continue;
-        }
-
-        if (p->ifa_addr->sa_family == AF_INET) {
-            struct sockaddr_in *a = (struct sockaddr_in *) p->ifa_addr;
-
-            if (((const uint8_t *) &a->sin_addr)[0] == 127) {
-                continue;
-            }
-
-            memset(&out[n], 0, sizeof(out[n]));
-            out[n].family = AF_INET;
-            memcpy(out[n].addr, &a->sin_addr, 4);
-            out[n].prefixlen = 32;
-            n++;
-
-        } else if (p->ifa_addr->sa_family == AF_INET6) {
-            struct sockaddr_in6 *a = (struct sockaddr_in6 *) p->ifa_addr;
-
-            if (IN6_IS_ADDR_LINKLOCAL(&a->sin6_addr)
-                || IN6_IS_ADDR_LOOPBACK(&a->sin6_addr))
-            {
-                continue;
-            }
-
-            memset(&out[n], 0, sizeof(out[n]));
-            out[n].family = AF_INET6;
-            memcpy(out[n].addr, &a->sin6_addr, 16);
-            out[n].prefixlen = 128;
-            n++;
-        }
-    }
-
-    freeifaddrs(ifa);
-    return n;
-}
-
-
 int
-vg_populate_local(struct vg_maps *m, struct vg_config *cfg)
+vg_populate_local(struct vg_maps *m, const struct vg_config *cfg)
 {
     int i, fd4, fd6;
     uint8_t one = 1;
-
-    if (cfg->auto_local) {
-        struct vg_cidr tmp[VG_MAX_CIDR_LIST];
-        int n = local_cidr_from_nic(cfg->interface, tmp, VG_MAX_CIDR_LIST);
-
-        if (n < 0) {
-            return -1;
-        }
-
-        memcpy(cfg->local_cidr, tmp, (size_t) n * sizeof(tmp[0]));
-        cfg->local_cidr_count = n;
-    }
 
     fd4 = bpf_map__fd(m->skel->maps.local_v4);
     fd6 = bpf_map__fd(m->skel->maps.local_v6);
