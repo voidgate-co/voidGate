@@ -13,7 +13,7 @@
 #define VG_MAX_IFACE  32
 #define VG_CFG_PATH_MAX  256
 
-struct vg_config_file {
+struct vg_config {
     char              interface[VG_MAX_IFACE];
     char              xdp_mode[16]; /* auto, native, skb */
     char              log_file[VG_CFG_PATH_MAX];
@@ -39,9 +39,9 @@ struct vg_config_file {
 };
 
 
-void vg_config_defaults(struct vg_config_file *c);
-int vg_config_load(const char *path, struct vg_config_file *c);
-int vg_cidr_is_protected(const struct vg_config_file *cfg,
+void vg_config_defaults(struct vg_config *c);
+int vg_config_load(const char *path, struct vg_config *c);
+int vg_cidr_is_protected(const struct vg_config *cfg,
     const struct vg_cidr *p);
 
 #endif /* _VG_CONFIG_H_INCLUDED_ */

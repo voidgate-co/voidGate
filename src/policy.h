@@ -25,7 +25,7 @@ struct vg_snap_ent;
 
 struct vg_ctrl {
     enum vg_state           state;
-    struct vg_config_file  *cfg;
+    struct vg_config       *cfg;
     struct vg_maps         *maps;
     char                    cfg_path[VG_CFG_PATH_MAX];
     char                    iface_override[VG_MAX_IFACE];
@@ -47,7 +47,7 @@ struct vg_ctrl {
 };
 
 
-int vg_ctrl_init(struct vg_ctrl *c, struct vg_config_file *cfg,
+int vg_ctrl_init(struct vg_ctrl *c, struct vg_config *cfg,
     struct vg_maps *maps, const char *cfg_path,
     const char *iface_ov);
 void vg_ctrl_free(struct vg_ctrl *c);

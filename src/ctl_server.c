@@ -193,7 +193,7 @@ static int
 vg_ctrl_reload(struct vg_ctrl *c)
 {
     uint32_t               rsz, dsz;
-    struct vg_config_file  n;
+    struct vg_config       n;
     char                   iface[VG_MAX_IFACE];
     char                   mode[16];
     char                   log_file[VG_CFG_PATH_MAX];

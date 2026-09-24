@@ -220,7 +220,7 @@ int                     i, n;
 size_t                  len;
 uint8_t                *p;
 uint32_t                key;
-struct vg_config        bc;
+struct vg_cfg           bc;
 struct vg_cidr          cidr;
 char                    tmp[128];
 ```
@@ -244,7 +244,7 @@ static void bump_memlock(void);
 static int libbpf_print(enum libbpf_print_level level, const char *fmt,
     va_list args);
 
-int vg_maps_open(struct vg_maps *m, struct vg_config_file *cfg);
+int vg_maps_open(struct vg_maps *m, struct vg_config *cfg);
 int vg_sum_percpu(struct vg_maps *m, int map_fd, const void *key,
     size_t val_size, void *out_sum);
 ```
@@ -265,7 +265,7 @@ sum_scratch_need(int ncpus)
 
 
 int
-vg_maps_open(struct vg_maps *m, struct vg_config_file *cfg)
+vg_maps_open(struct vg_maps *m, struct vg_config *cfg)
 {
     ...
 }

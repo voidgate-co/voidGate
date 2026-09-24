@@ -22,7 +22,7 @@ struct cfg_scalar {
     size_t          sz;
 };
 
-#define CFG_OFF(f)  offsetof(struct vg_config_file, f)
+#define CFG_OFF(f)  offsetof(struct vg_config, f)
 
 
 static char *trim(char *s);
@@ -30,20 +30,20 @@ static int parse_u64(const char *s, uint64_t *out);
 static int parse_int(const char *s, int *out);
 static int parse_csv_cidrs(char *val, struct vg_cidr *arr, int *count,
     int max);
-static int parse_allow_ports(char *val, struct vg_config_file *c);
-static int apply_scalar(struct vg_config_file *c, const struct cfg_scalar *s,
+static int parse_allow_ports(char *val, struct vg_config *c);
+static int apply_scalar(struct vg_config *c, const struct cfg_scalar *s,
     const char *val);
 
 
 static const struct cfg_scalar scalars[] = {
     { "interface", CFG_STR, CFG_OFF(interface),
-      sizeof(((struct vg_config_file *) NULL)->interface) },
+      sizeof(((struct vg_config *) NULL)->interface) },
     { "xdp_mode", CFG_STR, CFG_OFF(xdp_mode),
-      sizeof(((struct vg_config_file *) NULL)->xdp_mode) },
+      sizeof(((struct vg_config *) NULL)->xdp_mode) },
     { "log_file", CFG_STR, CFG_OFF(log_file),
-      sizeof(((struct vg_config_file *) NULL)->log_file) },
+      sizeof(((struct vg_config *) NULL)->log_file) },
     { "pid_file", CFG_STR, CFG_OFF(pid_file),
-      sizeof(((struct vg_config_file *) NULL)->pid_file) },
+      sizeof(((struct vg_config *) NULL)->pid_file) },
     { "wake_pps", CFG_U64, CFG_OFF(wake_pps), 0 },
     { "wake_mbps", CFG_U64, CFG_OFF(wake_mbps), 0 },
     { "idle_poll_ms", CFG_I32, CFG_OFF(idle_poll_ms), 0 },
@@ -59,7 +59,7 @@ static const struct cfg_scalar scalars[] = {
 
 
 void
-vg_config_defaults(struct vg_config_file *c)
+vg_config_defaults(struct vg_config *c)
 {
     memset(c, 0, sizeof(*c));
     snprintf(c->interface, sizeof(c->interface), "eth0");
@@ -169,7 +169,7 @@ parse_csv_cidrs(char *val, struct vg_cidr *arr, int *count,
 
 
 static int
-parse_allow_ports(char *val, struct vg_config_file *c)
+parse_allow_ports(char *val, struct vg_config *c)
 {
     char *save = NULL;
     char *tok = strtok_r(val, ",", &save);
@@ -202,7 +202,7 @@ parse_allow_ports(char *val, struct vg_config_file *c)
 
 
 static int
-apply_scalar(struct vg_config_file *c, const struct cfg_scalar *s,
+apply_scalar(struct vg_config *c, const struct cfg_scalar *s,
     const char *val)
 {
     switch (s->kind) {
@@ -249,7 +249,7 @@ apply_scalar(struct vg_config_file *c, const struct cfg_scalar *s,
 
 
 int
-vg_config_load(const char *path, struct vg_config_file *c)
+vg_config_load(const char *path, struct vg_config *c)
 {
     FILE *fp;
     char line[512];
@@ -355,7 +355,7 @@ fail:
 
 
 int
-vg_cidr_is_protected(const struct vg_config_file *cfg,
+vg_cidr_is_protected(const struct vg_config *cfg,
     const struct vg_cidr *p)
 {
     int i;

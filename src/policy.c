@@ -150,7 +150,7 @@ snap_get(struct vg_ctrl *c, int family, const uint8_t *addr, int *created)
 
 
 int
-vg_ctrl_init(struct vg_ctrl *c, struct vg_config_file *cfg,
+vg_ctrl_init(struct vg_ctrl *c, struct vg_config *cfg,
     struct vg_maps *maps, const char *cfg_path,
     const char *iface_ov)
 {

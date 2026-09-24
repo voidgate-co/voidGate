@@ -228,7 +228,7 @@ daemon_stop(const char *path)
 int
 main(int argc, char **argv)
 {
-    struct vg_config_file cfg;
+    struct vg_config cfg;
     struct vg_maps maps;
     struct vg_ctrl ctrl;
     const char *cfg_path = "/etc/voidgate/voidgate.conf";

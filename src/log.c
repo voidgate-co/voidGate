@@ -27,7 +27,7 @@ log_config_cidrs(const char *key, const struct vg_cidr *cidrs, int count)
 
 
 static void
-log_config_ports(const struct vg_config_file *cfg)
+log_config_ports(const struct vg_config *cfg)
 {
     int i;
 
@@ -43,7 +43,7 @@ log_config_ports(const struct vg_config_file *cfg)
 
 void
 vg_log_config_at(const char *file, int line,
-    const struct vg_config_file *cfg, uint32_t attach_flags)
+    const struct vg_config *cfg, uint32_t attach_flags)
 {
     if (vg_verbose < 1) {
         return;

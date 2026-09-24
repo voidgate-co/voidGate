@@ -396,7 +396,7 @@ static int
 set_armed(struct voidgate_bpf *skel, uint32_t armed)
 {
     __u32 key = 0;
-    struct vg_config cfg;
+    struct vg_cfg cfg;
 
     memset(&cfg, 0, sizeof(cfg));
     bpf_map_lookup_elem(bpf_map__fd(skel->maps.cfg), &key, &cfg);
@@ -526,7 +526,7 @@ static void
 test_prefixes(void)
 {
     struct vg_cidr p, n;
-    struct vg_config_file cfg;
+    struct vg_config cfg;
 
     printf("prefix / config tests\n");
     expect(vg_parse_cidr("10.1.2.3/24", &p) == 0 && p.addr[0] == 10

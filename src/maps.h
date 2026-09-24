@@ -24,13 +24,13 @@ struct vg_maps {
 };
 
 
-int vg_maps_open(struct vg_maps *m, struct vg_config_file *cfg);
+int vg_maps_open(struct vg_maps *m, struct vg_config *cfg);
 void vg_maps_close(struct vg_maps *m);
-int vg_xdp_attach(struct vg_maps *m, const struct vg_config_file *cfg);
+int vg_xdp_attach(struct vg_maps *m, const struct vg_config *cfg);
 void vg_xdp_detach(struct vg_maps *m);
 
 int vg_cfg_commit(struct vg_maps *m, uint32_t armed,
-    const struct vg_config_file *cfg);
+    const struct vg_config *cfg);
 
 int vg_metrics_read(struct vg_maps *m, struct vg_metrics *out);
 int vg_sum_percpu(struct vg_maps *m, int map_fd, const void *key,
@@ -51,8 +51,8 @@ int vg_drop_add(struct vg_maps *m, const struct vg_cidr *p, uint32_t reason,
 int vg_drop_del(struct vg_maps *m, const struct vg_cidr *p);
 int vg_drop_flush(struct vg_maps *m);
 
-int vg_populate_local(struct vg_maps *m, struct vg_config_file *cfg);
-int vg_populate_allow(struct vg_maps *m, const struct vg_config_file *cfg);
+int vg_populate_local(struct vg_maps *m, struct vg_config *cfg);
+int vg_populate_allow(struct vg_maps *m, const struct vg_config *cfg);
 
 int vg_maps_metrics_fd(struct vg_maps *m);
 int vg_maps_remote_v4_fd(struct vg_maps *m);

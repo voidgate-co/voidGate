@@ -49,7 +49,7 @@ vg_drop_add(struct vg_maps *m, const struct vg_cidr *p, uint32_t reason,
 
 int
 vg_cfg_commit(struct vg_maps *m, uint32_t armed,
-    const struct vg_config_file *cfg)
+    const struct vg_config *cfg)
 {
     (void) m;
     (void) armed;
@@ -67,7 +67,7 @@ vg_drop_flush(struct vg_maps *m)
 
 
 int
-vg_populate_allow(struct vg_maps *m, const struct vg_config_file *cfg)
+vg_populate_allow(struct vg_maps *m, const struct vg_config *cfg)
 {
     (void) m;
     (void) cfg;
@@ -76,7 +76,7 @@ vg_populate_allow(struct vg_maps *m, const struct vg_config_file *cfg)
 
 
 int
-vg_populate_local(struct vg_maps *m, struct vg_config_file *cfg)
+vg_populate_local(struct vg_maps *m, struct vg_config *cfg)
 {
     (void) m;
     (void) cfg;
@@ -141,7 +141,7 @@ tick(struct vg_ctrl *c)
 int
 main(void)
 {
-    struct vg_config_file cfg;
+    struct vg_config cfg;
     struct vg_ctrl c;
     struct vg_cidr expired, manual;
     int i, drops_before;

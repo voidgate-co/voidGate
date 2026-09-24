@@ -13,17 +13,17 @@
 
 
 static __always_inline struct vg_metrics *get_metrics(void);
-static __always_inline struct vg_config *get_cfg(void);
-static __always_inline int port_allowed(const struct vg_config *c, __u16 port);
+static __always_inline struct vg_cfg *get_cfg(void);
+static __always_inline int port_allowed(const struct vg_cfg *c, __u16 port);
 static __always_inline int v4_in_lpm(void *map, __be32 ip);
 static __always_inline int v6_in_lpm(void *map, const __u8 addr[16]);
 static __always_inline int v6_is_linklocal(const __u8 addr[16]);
 static __always_inline int v6_is_mcast_link(const __u8 addr[16]);
 static __always_inline void acc_in(struct host_counters *c, __u64 bytes);
 static __always_inline int dhcp_ports(__u16 sport, __u16 dport);
-static __always_inline int v4_tcp_allowed(const struct vg_config *c,
+static __always_inline int v4_tcp_allowed(const struct vg_cfg *c,
     __be32 saddr, __be32 daddr, __u16 sport, __u16 dport);
-static __always_inline int v6_tcp_allowed(const struct vg_config *c,
+static __always_inline int v6_tcp_allowed(const struct vg_cfg *c,
     const __u8 saddr[16], const __u8 daddr[16], __u16 sport, __u16 dport);
 static __always_inline int parse_l4(void *l4, void *data_end, __u8 proto,
     __u16 *sport, __u16 *dport, __u8 *icmp6_type);
@@ -37,7 +37,7 @@ struct {
     __uint(type, BPF_MAP_TYPE_ARRAY);
     __uint(max_entries, 1);
     __type(key, __u32);
-    __type(value, struct vg_config);
+    __type(value, struct vg_cfg);
 } cfg SEC(".maps");
 
 
@@ -155,7 +155,7 @@ get_metrics(void)
 }
 
 
-static __always_inline struct vg_config *
+static __always_inline struct vg_cfg *
 get_cfg(void)
 {
     __u32 key = 0;
@@ -165,7 +165,7 @@ get_cfg(void)
 
 
 static __always_inline int
-port_allowed(const struct vg_config *c, __u16 port)
+port_allowed(const struct vg_cfg *c, __u16 port)
 {
     int i;
 
@@ -267,7 +267,7 @@ dhcp_ports(__u16 sport, __u16 dport)
  * is not a whitelist hit.
  */
 static __always_inline int
-v4_tcp_allowed(const struct vg_config *c,
+v4_tcp_allowed(const struct vg_cfg *c,
     __be32 saddr, __be32 daddr,
     __u16 sport, __u16 dport)
 {
@@ -284,7 +284,7 @@ v4_tcp_allowed(const struct vg_config *c,
 
 
 static __always_inline int
-v6_tcp_allowed(const struct vg_config *c,
+v6_tcp_allowed(const struct vg_cfg *c,
     const __u8 saddr[16],
     const __u8 daddr[16], __u16 sport,
     __u16 dport)
@@ -443,7 +443,7 @@ voidgate_xdp(struct xdp_md *ctx)
     void *data = (void *) (long) ctx->data;
     void *data_end = (void *) (long) ctx->data_end;
     struct vg_metrics *m = get_metrics();
-    struct vg_config *c;
+    struct vg_cfg *c;
     struct vg_eth *eth;
     void *nh;
     __u16 eth_proto;

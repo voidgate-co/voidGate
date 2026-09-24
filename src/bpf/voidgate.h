@@ -63,7 +63,7 @@ struct vg_metrics {
 };
 
 
-struct vg_config {
+struct vg_cfg {
     __u32  armed;
     __u16  allow_ports[VG_MAX_ALLOW_PORTS];
     __u16  allow_port_count;

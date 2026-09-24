@@ -13,11 +13,11 @@
 
 extern int vg_verbose;
 
-struct vg_config_file;
+struct vg_config;
 
 
 void vg_log_config_at(const char *file, int line,
-    const struct vg_config_file *cfg, uint32_t attach_flags);
+    const struct vg_config *cfg, uint32_t attach_flags);
 
 #define VG_SGR_DIM     "\033[2m"
 #define VG_SGR_CYAN    "\033[36m"
