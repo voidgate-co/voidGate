@@ -79,10 +79,6 @@ vg_maps_open(struct vg_maps *m, struct vg_config_file *cfg)
 
     m->ifindex = (int) if_nametoindex(cfg->interface);
 
-    if (m->ifindex == 0) {
-        vg_die("unknown interface %s", cfg->interface);
-    }
-
     bump_memlock();
     libbpf_set_print(libbpf_print);
 
