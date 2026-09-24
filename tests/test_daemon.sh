@@ -79,7 +79,7 @@ expect_failure "$root/voidgate" -s stop -c base.conf
 # Default daemon log, permissions and append across restarts.
 start_daemon -c base.conf
 [[ $(readlink "/proc/$pid/fd/2") == "$work/log/voidgate.log" ]]
-[[ $(stat -c %a "$work/log/voidgate.log") == 640 ]]
+[[ $(stat -c %a "$work/log/voidgate.log") == 644 ]]
 stop_daemon
 printf 'append marker\n' >> "$work/log/voidgate.log"
 start_daemon -c base.conf

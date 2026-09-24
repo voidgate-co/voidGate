@@ -285,7 +285,7 @@ main(int argc, char **argv)
         vg_die("unknown interface %s", cfg.interface);
     }
 
-    log_fd = open(cfg.log_file, O_WRONLY | O_CREAT | O_APPEND, 0640);
+    log_fd = open(cfg.log_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
 
     if (log_fd < 0) {
         vg_die("open log %s: %s", cfg.log_file, strerror(errno));

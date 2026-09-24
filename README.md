@@ -60,7 +60,7 @@ details are in the log file. SIGTERM shuts down the daemon and detaches XDP.
 The supplied systemd service continues running in the foreground.
 
 `log_file` in the configuration selects the append-only log. Omit the key for
-`/var/log/voidgate.log`. Files are created with mode `0640` subject to
+`/var/log/voidgate.log`. Files are created with mode `0644` subject to
 the process umask; parent directories must already exist. `pid_file` is
 `/run/voidgate.pid` when omitted; `-s stop` reads it. Relative log, pid, and
 config paths use the launch directory, which the daemon retains for
