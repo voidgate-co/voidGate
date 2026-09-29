@@ -55,13 +55,13 @@
                 <button type="button" class="copy">Copy</button>
             </div>
             <pre><code>sudo apt install clang llvm libbpf-dev libelf-dev zlib1g-dev \
-    linux-tools-generic make gcc
+    linux-tools-generic make gcc libtest-base-perl
 git clone https://github.com/lynch1981/VoidGate.git
 cd VoidGate
 make
-sudo ./tests/test_xdp</code></pre>
+make test</code></pre>
         </div>
-        <p><code>make test</code> also runs <code>tests/test_policy</code> and <code>tests/test_netns.sh</code> (veth flood, needs root). If a BPF change compiles but <code>test_xdp</code> cannot load the object, the verifier rejected it — fix the program, do not weaken the test.</p>
+        <p><code>make test</code> runs <code>t/unit/policy</code>, then <code>t/bin/run</code>: the real daemon on a veth pair in private namespaces, driven by the Perl Test::Base suite in <code>t/</code> (needs sudo). If a BPF change compiles but the daemon cannot load the object, the verifier rejected it — fix the program, do not weaken the test.</p>
 
         <h2>Run</h2>
         <div class="code">

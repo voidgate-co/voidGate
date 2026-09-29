@@ -1,7 +1,6 @@
 voidgate
 voidgatectl
-tests/test_xdp
-tests/test_ctrl
+t/unit/policy
 *.o
 *.d
 *~

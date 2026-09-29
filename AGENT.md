@@ -28,8 +28,11 @@ src/maps.c               libbpf load/attach, LPM helpers
 src/config.c             key=value config
 src/ipaddr.c             CIDR parse / overlap
 configs/voidgate.conf
-tests/test_xdp.c         bpf_prog_test_run (needs root)
-tests/test_netns.sh      veth flood (needs root)
+t/*.t                    XDP verdict / CIDR blocks (Test::Base); see t/README.md
+t/lib/VG/*.pm            suite glue: frame builder, ctl client
+t/bin/run                real daemon + prove t/ (needs root)
+t/unit/policy.c          control-plane unit test
+t/integration/*.sh       daemon / Lua / veth flood (needs root)
 ```
 
 Generated, do not edit or commit: `src/bpf/voidgate.skel.h`, `*.o`,
@@ -99,18 +102,17 @@ LPM lookup key prefixlen is 32/128 for a host query. LPM_TRIE maps need
 
 ```
 make
-./tests/test_policy
-sudo ./tests/test_xdp
-sudo tests/test_netns.sh
-sudo bash tests/test_daemon.sh
-sudo bash tests/test_lua.sh
+make test                         # t/unit/policy + sudo t/bin/run
+sudo t/integration/netns.sh
+sudo t/integration/daemon.sh
+sudo t/integration/lua.sh
 ```
 
-Needs clang, llvm, libbpf, bpftool, libelf, root (or `CAP_BPF` +
+Needs clang, llvm, libbpf, bpftool, libelf, libtest-base-perl, root (or `CAP_BPF` +
 `CAP_NET_ADMIN`). Kernel 5.8+ with BTF.
 
-Attach: native (`XDP_FLAGS_DRV_MODE`) then SKB fallback. Tests use SKB /
-`bpf_prog_test_run` and do not require a real NIC.
+Attach: native (`XDP_FLAGS_DRV_MODE`) then SKB fallback. Tests attach in
+SKB mode to a veth pair and do not require a real NIC.
 
 `voidgatectl` talks to `/run/voidgate.sock`. Prometheus (if
 `metrics_port` > 0): `127.0.0.1:9105/metrics`.
@@ -128,12 +130,14 @@ Attach: native (`XDP_FLAGS_DRV_MODE`) then SKB fallback. Tests use SKB /
   Example: `style: 4-space indent and braced if/else`.
 - Verifier first: bounded unrolls (`VG_MAX_VLANS`, `VG_MAX_ALLOW_PORTS`),
   `data_end` checks before every packet deref. If a BPF change compiles
-  but `test_xdp` cannot load the object, the verifier rejected it — fix
-  the program, do not weaken tests.
+  but the daemon cannot load the object (see `daemon.log` printed by
+  `t/bin/run`), the verifier rejected it — fix the program, do
+  not weaken tests.
 - After changing `voidgate.bpf.c` or map layouts in `voidgate.h`, rebuild
-  the skeleton (`make` does this) and run `sudo ./tests/test_xdp`. If
-  you change drop/allow/idle behavior, extend that test; if you change
-  wake/arm, run `tests/test_netns.sh`.
+  the skeleton (`make` does this) and run `sudo t/bin/run`.
+  If you change drop/allow/idle behavior, add `===` blocks to `t/*.t`
+  (packet specs: `t/lib/VG/Packet.pm`); if you change wake/arm, run
+  `t/integration/netns.sh`.
 - Unix ctl protocol is one line in, text out: `status`, `stats`,
   `drops`, `arm`, `disarm`, `drop <cidr>`, `undrop <cidr>`, `reload`.
 - `reload` re-reads the config file and replaces allow/local maps +

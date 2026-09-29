@@ -3,7 +3,7 @@
 # Run Lua control tests against a daemon in private namespaces.
 set -euo pipefail
 
-. "$(dirname "$0")/create_env.sh"
+. "$(dirname "$0")/../bin/create_env.sh"
 
 conf=$work/voidgate.conf
 
@@ -17,12 +17,12 @@ cleanup() {
 }
 trap cleanup EXIT
 
-cp "$root/tests/idle.conf" "$conf"
+cp "$root/t/conf/idle.conf" "$conf"
 printf 'log_file = %s\n' "$work/daemon.log" >> "$conf"
 printf 'pid_file = %s\n' "$work/voidgate.pid" >> "$conf"
 
 timeout --kill-after=2 10 "$root/voidgate" -d -c "$conf"
 
 cd "$root"
-timeout --kill-after=5 30 lua tests/test_lua.lua \
+timeout --kill-after=5 30 lua t/integration/lua.lua \
     /run/voidgate.sock "$conf"

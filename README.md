@@ -31,9 +31,9 @@ On Ubuntu 24.04:
 
 ```
 sudo apt install clang llvm libbpf-dev libelf-dev zlib1g-dev \
-    linux-tools-generic make gcc
+    linux-tools-generic make gcc libtest-base-perl
 make
-sudo ./tests/test_xdp
+make test
 ```
 
 ## Run
@@ -68,7 +68,7 @@ configuration reloads. `-v` and `-vv` retain their usual verbosity. Restart
 voidgate after rotating the log file or changing its destination; configuration
 reload does not reopen logs or move the pid file.
 
-Run `sudo bash tests/test_daemon.sh` to test daemon startup and logging in
+Run `sudo t/integration/daemon.sh` to test daemon startup and logging in
 isolated mount, network and PID namespaces (requires sudo and BPF support).
 
 Edit `interface` in the config to the VM's public NIC. Do not point this
@@ -140,7 +140,7 @@ Run the Lua control tests against an isolated real daemon (requires sudo,
 BPF support, Bash, coreutils, iproute2, util-linux, Lua, and LuaSocket):
 
 ```sh
-sudo bash tests/test_lua.sh
+sudo t/integration/lua.sh
 ```
 
 The Bash runner creates private network, mount and PID namespaces, a temporary

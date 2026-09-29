@@ -8,7 +8,7 @@ This file is voidGate’s version: same rules, `vg_` / `VG_` names, and
 the deviations in the last section. Product, BPF, and commit-message
 rules stay in AGENT.md.
 
-Hand-written C and H in `src/` and `tests/` follow this guide. Makefile
+Hand-written C and H in `src/` and `t/` follow this guide. Makefile
 recipes stay tab-indented (required by make). Do not hand-edit
 `src/bpf/voidgate.skel.h`.
 

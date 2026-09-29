@@ -1,0 +1,40 @@
+#!/bin/bash
+# SPDX-License-Identifier: Apache-2.0
+# Run the Perl Test::Base suite (t/*.t) against a real daemon in private
+# namespaces. Extra arguments go to prove, e.g. -v t/v4.t.
+# Usage: sudo t/bin/run [prove args]
+set -euo pipefail
+
+. "$(dirname "$0")/create_env.sh"
+
+conf=$work/voidgate.conf
+
+cleanup() {
+    local result=$?
+    trap - EXIT
+    if [[ -e $work/voidgate.pid ]]; then
+        "$root/voidgate" -s stop -c "$conf" 2>/dev/null || true
+    fi
+    if (( result != 0 )) && [[ -e $work/daemon.log ]]; then
+        echo "--- daemon.log" >&2
+        cat "$work/daemon.log" >&2
+    fi
+    exit "$result"
+}
+trap cleanup EXIT
+
+cp "$root/t/conf/xdp.conf" "$conf"
+printf 'log_file = %s\n' "$work/daemon.log" >> "$conf"
+printf 'pid_file = %s\n' "$work/voidgate.pid" >> "$conf"
+
+# Frames sent from peer0 are the only ingress on test0: no address, no
+# IPv6 autoconf, so the kernel adds no ARP/DAD/RS/MLD noise.
+sysctl -qw net.ipv6.conf.peer0.disable_ipv6=1
+
+timeout --kill-after=2 10 "$root/voidgate" -d -c "$conf"
+
+cd "$root"
+if (( $# == 0 )); then
+    set -- -r t/
+fi
+VG_PEER=peer0 prove -I t/lib "$@"

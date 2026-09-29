@@ -1,0 +1,34 @@
+#!/usr/bin/env perl
+# SPDX-License-Identifier: Apache-2.0
+# Renumber Test::Base block names as "=== TEST N: name" in each file.
+# Usage: t/bin/reindex t/*.t
+
+use strict;
+use warnings;
+
+die "usage: $0 file.t ...\n" unless @ARGV;
+
+for my $file (@ARGV) {
+    open my $in, '<', $file or die "$file: $!\n";
+    my @lines = <$in>;
+    close $in;
+
+    my ($data, $n, $changed) = (0, 0, 0);
+
+    for (@lines) {
+        $data = 1 if /^__DATA__$/;
+        next unless $data && /^===\s/;
+
+        my $old = $_;
+
+        s/^===\s+(?:TEST\s+\d+:\s*)?/'=== TEST ' . ++$n . ': '/e;
+        $changed++ if $_ ne $old;
+    }
+
+    next unless $changed;
+
+    open my $out, '>', $file or die "$file: $!\n";
+    print {$out} @lines;
+    close $out;
+    print "$file: $changed of $n blocks renumbered\n";
+}

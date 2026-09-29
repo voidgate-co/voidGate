@@ -2,7 +2,7 @@
 # Integration: veth pair, daemon starts IDLE, flood wakes it, drop works,
 # SSH-like TCP still passes.
 set -euo pipefail
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 BIN="$ROOT/voidgate"
 CTL="$ROOT/voidgatectl"
 CONF=$(mktemp)

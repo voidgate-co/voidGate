@@ -25,11 +25,10 @@ BPF_CFLAGS := -O2 -g -target bpf -D__TARGET_ARCH_$(ARCH) \
 USER_OBJS := src/voidgate.o src/config.o src/policy.o src/maps.o src/ipaddr.o \
 	src/ctl_server.o src/http.o src/log.o
 CTL_OBJS  := src/voidgatectl.o
-TEST_OBJS := tests/test_xdp.o src/ipaddr.o src/config.o src/log.o
 
-.PHONY: all clean install install-lua
+.PHONY: all clean install install-lua test
 
-all: voidgate voidgatectl tests/test_xdp tests/test_policy
+all: voidgate voidgatectl t/unit/policy
 
 $(BPFDIR)/voidgate.bpf.o: $(BPFDIR)/voidgate.bpf.c $(BPFDIR)/voidgate.h
 	$(CLANG) $(BPF_CFLAGS) -c $< -o $@
@@ -38,13 +37,10 @@ $(BPFDIR)/voidgate.bpf.o: $(BPFDIR)/voidgate.bpf.c $(BPFDIR)/voidgate.h
 $(BPFDIR)/voidgate.skel.h: $(BPFDIR)/voidgate.bpf.o
 	$(BPFTOOL) gen skeleton $< > $@
 
-src/voidgate.o src/maps.o src/policy.o tests/test_xdp.o: \
+src/voidgate.o src/maps.o src/policy.o: \
 	$(BPFDIR)/voidgate.skel.h
 
 src/%.o: src/%.c
-	$(CC) $(CFLAGS) -c $< -o $@
-
-tests/%.o: tests/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 voidgate: $(USER_OBJS)
@@ -53,25 +49,26 @@ voidgate: $(USER_OBJS)
 voidgatectl: $(CTL_OBJS)
 	$(CC) $(CFLAGS) -o $@ $(CTL_OBJS)
 
-tests/test_xdp: tests/test_xdp.o src/ipaddr.o src/config.o src/log.o
-	$(CC) $(CFLAGS) -o $@ tests/test_xdp.o src/ipaddr.o src/config.o \
-		src/log.o $(LDFLAGS)
-
-tests/test_policy: tests/test_policy.c src/policy.c src/policy.h \
+t/unit/policy: t/unit/policy.c src/policy.c src/policy.h \
 	src/log.h src/config.h src/maps.h src/ipaddr.h \
 	$(BPFDIR)/voidgate.h src/config.o src/ipaddr.o src/log.o
-	$(CC) $(CFLAGS) -DVG_CTRL_TEST -MF tests/test_policy.d -o $@ \
-		tests/test_policy.c src/policy.c src/config.o src/ipaddr.o \
+	$(CC) $(CFLAGS) -DVG_CTRL_TEST -MF t/unit/policy.d -o $@ \
+		t/unit/policy.c src/policy.c src/config.o src/ipaddr.o \
 		src/log.o
 
+# Policy unit test, then XDP verdicts: real daemon + t/*.t (needs root).
+test: all
+	./t/unit/policy
+	sudo t/bin/run
+
 clean:
-	rm -f voidgate voidgatectl tests/test_xdp tests/test_policy \
-		src/*.o src/*.d tests/*.o tests/*.d \
+	rm -f voidgate voidgatectl t/unit/policy t/unit/policy.d \
+		src/*.o src/*.d \
 		$(BPFDIR)/voidgate.bpf.o $(BPFDIR)/voidgate.bpf.d \
 		$(BPFDIR)/voidgate.skel.h
 
--include $(USER_OBJS:.o=.d) $(CTL_OBJS:.o=.d) tests/test_xdp.d \
-	tests/test_policy.d $(BPFDIR)/voidgate.bpf.d
+-include $(USER_OBJS:.o=.d) $(CTL_OBJS:.o=.d) t/unit/policy.d \
+	 $(BPFDIR)/voidgate.bpf.d
 
 install: all
 	install -d $(DESTDIR)$(PREFIX)/sbin

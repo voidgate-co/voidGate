@@ -12,7 +12,8 @@ if [[ -z ${2:-} || $(readlink /proc/self/ns/mnt) == "$2" ]]; then
 fi
 shift 2
 
-root=$(cd "$(dirname "$0")/.." && pwd)
+# Callers live in t/bin or t/integration: the repo root is two levels up.
+root=$(cd "$(dirname "$0")/../.." && pwd)
 work=/tmp/voidgate
 
 mount -t tmpfs -o mode=755 tmpfs /run

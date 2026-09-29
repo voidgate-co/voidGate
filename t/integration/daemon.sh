@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Exercise real daemon startup in disposable mount, network and PID namespaces.
 set -euo pipefail
-. "$(dirname "$0")/create_env.sh"
+. "$(dirname "$0")/../bin/create_env.sh"
 
 directory=$(mktemp -d /tmp/voidgate-XXXXXX)
 pid=
@@ -26,7 +26,7 @@ trap 'exit 143' TERM
 
 cd "$directory"
 umask 022
-cp "$root/tests/idle.conf" base.conf
+cp "$root/t/conf/idle.conf" base.conf
 mkdir "$work/log"
 printf 'log_file = %s\n' "$work/log/voidgate.log" >> base.conf
 
