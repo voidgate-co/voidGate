@@ -39,11 +39,10 @@ expect_cidr(const char *in, const char *want)
 }
 
 
-static void
-expect_config(const char *line, int want_rc)
+static int
+load_config(const char *line, struct vg_config *cfg)
 {
     char path[] = "/tmp/vg-cidr-XXXXXX";
-    struct vg_config cfg;
     FILE *fp;
     int fd, rc;
 
@@ -56,12 +55,72 @@ expect_config(const char *line, int want_rc)
 
     fprintf(fp, "%s\n", line);
     fclose(fp);
-    rc = vg_config_load(path, &cfg);
+    rc = vg_config_load(path, cfg);
     unlink(path);
+    return rc;
+}
+
+
+static void
+expect_config(const char *line, int want_rc)
+{
+    struct vg_config cfg;
+    int rc = load_config(line, &cfg);
 
     if (rc != want_rc) {
         printf("FAIL config '%s': want %d, got %d\n", line, want_rc, rc);
         g_fail++;
+    }
+}
+
+
+/* A CSV list far longer than any fixed line buffer must load whole: a line
+ * split mid-token can turn 10.0.37.0/24 into 10.0.37.0/2, a /2 allow.
+ */
+static void
+expect_long_list(int family, int n)
+{
+    static char line[16384];
+    struct vg_config cfg;
+    struct vg_cidr *list;
+    size_t used;
+    int i, rc, count, plen = family == AF_INET ? 24 : 48;
+
+    used = (size_t) snprintf(line, sizeof(line), "%s =",
+                             family == AF_INET ? "allow_networks"
+                                               : "local_networks");
+
+    for (i = 0; i < n; i++) {
+        const char *sep = i ? ", " : " ";
+
+        if (family == AF_INET) {
+            used += (size_t) snprintf(line + used, sizeof(line) - used,
+                                      "%s10.%d.%d.0/24", sep, i / 256, i % 256);
+
+        } else {
+            used += (size_t) snprintf(line + used, sizeof(line) - used,
+                                      "%s2001:db8:%x::/48", sep, i);
+        }
+    }
+
+    rc = load_config(line, &cfg);
+    list = family == AF_INET ? cfg.allow_cidr : cfg.local_cidr;
+    count = family == AF_INET ? cfg.allow_cidr_count : cfg.local_cidr_count;
+
+    if (rc != 0 || count != n) {
+        printf("FAIL %zu-byte %s list: rc %d, %d of %d entries\n", used,
+               family == AF_INET ? "v4" : "v6", rc, count, n);
+        g_fail++;
+        return;
+    }
+
+    for (i = 0; i < count; i++) {
+        if (list[i].prefixlen != plen) {
+            printf("FAIL long list entry %d has prefix /%u\n", i,
+                   list[i].prefixlen);
+            g_fail++;
+            return;
+        }
     }
 }
 
@@ -104,6 +163,10 @@ main(void)
     expect_config("allow_networks = 10.0.0.0/", -1);
     expect_config("allow_networks = 10.0.0.0/abc", -1);
     expect_config("local_networks = 198.51.100.0/280", -1);
+
+    /* VG_MAX_CIDR_LIST entries: about 4 KB (v4) and 5 KB (v6) per line. */
+    expect_long_list(AF_INET, VG_MAX_CIDR_LIST);
+    expect_long_list(AF_INET6, VG_MAX_CIDR_LIST);
 
     if (g_fail) {
         printf("%d cidr unit check(s) failed\n", g_fail);

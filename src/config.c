@@ -257,7 +257,8 @@ int
 vg_config_load(const char *path, struct vg_config *c)
 {
     FILE *fp;
-    char line[512];
+    char *line = NULL;
+    size_t cap = 0;
     int lineno = 0;
 
     vg_config_defaults(c);
@@ -273,7 +274,10 @@ vg_config_load(const char *path, struct vg_config *c)
         return 0;
     }
 
-    while (fgets(line, sizeof(line), fp)) {
+    /* getline, not a fixed buffer: a CSV list (up to VG_MAX_CIDR_LIST
+     * entries) split mid-token would parse the pieces as other prefixes.
+     */
+    while (getline(&line, &cap, fp) != -1) {
         char *eq, *key, *val;
         size_t i;
         int found = 0;
@@ -345,6 +349,13 @@ vg_config_load(const char *path, struct vg_config *c)
             vg_warn("%s:%d: unknown key '%s'", path, lineno, key);
         }
     }
+
+    if (ferror(fp)) {
+        vg_warn("%s: read error: %s", path, strerror(errno));
+        goto fail;
+    }
+
+    free(line);
     fclose(fp);
 
     if (c->idle_poll_ms <= 0) {
@@ -354,6 +365,7 @@ vg_config_load(const char *path, struct vg_config *c)
     return 0;
 
 fail:
+    free(line);
     fclose(fp);
     return -1;
 }
