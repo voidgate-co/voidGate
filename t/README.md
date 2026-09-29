@@ -86,7 +86,7 @@ Everything test-related lives under `t/`. `prove -r t/` only picks up
 | `lib/VG/Ctl.pm` | control socket client (`ctl`, `stats`) |
 | `bin/run` | runs the `*.t` suite against a real daemon |
 | `bin/create_env.sh` | private namespaces + `test0`/`peer0` veth; sourced by `bin/run` and `integration/*.sh` |
-| `bin/reindex` | renumbers `=== TEST N:` block names |
+| `bin/reindex` | renumbers `=== TEST N:` blocks, normalizes spacing |
 | `conf/xdp.conf` | daemon fixture for the `*.t` suite |
 | `conf/idle.conf` | never-wake fixture for `integration/daemon.sh` and `lua.sh` |
 | `unit/policy.c` | control-plane unit test, built as `t/unit/policy` by `make` (no root) |
@@ -223,7 +223,18 @@ drops), sends `input` as one control command, and compares the reply:
 with `reason=` and `age=` stripped. Leave it empty (`--- drops:`) to
 assert that nothing was installed.
 
-## Numbering
+## Numbering and spacing
+
+Blocks are separated by three empty lines (the OpenResty convention), so
+each case stands apart when reading a file:
+
+```
+--- verdict: XDP_DROP
+
+
+
+=== TEST 8: UDP sport 67 from dropped src is not a whitelist
+```
 
 Every block is named `=== TEST N: <behavior>`, numbered from 1 in each
 file, so a failure such as
@@ -240,9 +251,11 @@ renumber:
 t/bin/reindex t/*.t
 ```
 
-`reindex` only rewrites `===` lines after `__DATA__`, adds the
-`TEST N:` prefix to blocks that lack one, and leaves already-correct
-files untouched, so it is safe to run on every file.
+`reindex` only touches layout: it puts one empty line after the file's
+leading comment block, numbers the `===` lines (adding the `TEST N:`
+prefix where missing), puts one empty line after `__DATA__`, exactly
+three between blocks and none at the end of the file. Files that already follow the rules are left untouched, so it
+is safe to run on every file.
 
 ## Adding a test
 

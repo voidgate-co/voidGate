@@ -1,6 +1,9 @@
 #!/usr/bin/env perl
 # SPDX-License-Identifier: Apache-2.0
-# Renumber Test::Base block names as "=== TEST N: name" in each file.
+# Normalize Test::Base data in each file, OpenResty style:
+#   - one empty line after the leading comment block;
+#   - block names become "=== TEST N: name", numbered from 1;
+#   - one empty line after __DATA__, three between blocks, none at EOF.
 # Usage: t/bin/reindex t/*.t
 
 use strict;
@@ -13,22 +16,44 @@ for my $file (@ARGV) {
     my @lines = <$in>;
     close $in;
 
-    my ($data, $n, $changed) = (0, 0, 0);
+    my (@out, $data, $n, $head);
+    my $orig = join '', @lines;
 
-    for (@lines) {
-        $data = 1 if /^__DATA__$/;
-        next unless $data && /^===\s/;
+    $n = 0;
 
-        my $old = $_;
+    # One empty line after the leading comment block.
+    $head = 0;
+    $head++ while $head < @lines && $lines[$head] =~ /^#/;
 
-        s/^===\s+(?:TEST\s+\d+:\s*)?/'=== TEST ' . ++$n . ': '/e;
-        $changed++ if $_ ne $old;
+    if ($head && $head < @lines) {
+        splice @lines, $head, 1 while $head < @lines
+                                      && $lines[$head] =~ /^\s*$/;
+        splice @lines, $head, 0, "\n";
     }
 
-    next unless $changed;
+    for (@lines) {
+        if (!$data) {
+            push @out, $_;
+            $data = 1 if /^__DATA__$/;
+            next;
+        }
+
+        if (/^===\s/) {
+            pop @out while @out && $out[-1] =~ /^\s*$/;
+            push @out, ("\n") x ($n ? 3 : 1);
+            s/^===\s+(?:TEST\s+\d+:\s*)?/'=== TEST ' . ++$n . ': '/e;
+        }
+
+        push @out, $_;
+    }
+
+    pop @out while $data && @out && $out[-1] =~ /^\s*$/;
+    $out[-1] .= "\n" if @out && $out[-1] !~ /\n\z/;
+
+    next if join('', @out) eq $orig;
 
     open my $out, '>', $file or die "$file: $!\n";
-    print {$out} @lines;
+    print {$out} @out;
     close $out;
-    print "$file: $changed of $n blocks renumbered\n";
+    print "$file: $n blocks reindexed\n";
 }

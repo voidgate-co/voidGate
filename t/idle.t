@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 # IDLE: armed == 0 passes everything and only bumps the rx counters.
+
 use VG::Test;
 
 run_xdp_blocks();
