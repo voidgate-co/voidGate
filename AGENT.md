@@ -32,6 +32,7 @@ t/*.t                    XDP verdict / CIDR blocks (Test::Base); see t/README.md
 t/lib/VG/*.pm            suite glue: frame builder, ctl client
 t/bin/run                real daemon + prove t/ (needs root)
 t/unit/policy.c          control-plane unit test
+t/unit/cidr.c            CIDR parser + config CIDR lists unit test
 t/integration/*.sh       daemon / Lua / veth flood (needs root)
 ```
 
@@ -102,7 +103,7 @@ LPM lookup key prefixlen is 32/128 for a host query. LPM_TRIE maps need
 
 ```
 make
-make test                         # t/unit/policy + sudo t/bin/run
+make test                         # t/unit/* + sudo t/bin/run
 sudo t/integration/netns.sh
 sudo t/integration/daemon.sh
 sudo t/integration/lua.sh

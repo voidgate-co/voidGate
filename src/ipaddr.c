@@ -5,65 +5,64 @@
 
 #include <arpa/inet.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 
 static int bits_equal(const uint8_t *a, const uint8_t *b, int bits);
 
 
+/* "addr" or "addr/len". len is 1-3 plain decimal digits within the family's
+ * width; anything else (empty, sign, space, trailing text, out of range)
+ * is rejected rather than read as /0 or truncated to 8 bits.
+ */
 int
 vg_parse_cidr(const char *s, struct vg_cidr *out)
 {
-    int    plen;
-    char  *slash;
-    char   tmp[128];
+    int     plen, max;
+    size_t  len;
+    char   *slash, *p;
+    char    tmp[128];
 
     if (s == NULL || out == NULL) {
         return -1;
     }
 
     memset(out, 0, sizeof(*out));
-    snprintf(tmp, sizeof(tmp), "%s", s);
+    len = strlen(s);
+
+    if (len >= sizeof(tmp)) {
+        return -1;
+    }
+
+    memcpy(tmp, s, len + 1);
     slash = strchr(tmp, '/');
+    plen = -1;
 
     if (slash != NULL) {
-        *slash = 0;
-        plen = atoi(slash + 1);
+        *slash = '\0';
+        p = slash + 1;
 
-    } else {
-        plen = -1;
-    }
-
-    if (strchr(tmp, ':') != NULL) {
-        out->family = AF_INET6;
-
-        if (inet_pton(AF_INET6, tmp, out->addr) != 1) {
+        if (*p == '\0') {
             return -1;
         }
 
-        out->prefixlen = (uint8_t) (plen < 0 ? 128 : plen);
+        for (plen = 0; *p != '\0'; p++) {
+            if (*p < '0' || *p > '9' || plen > 128) {
+                return -1;
+            }
 
-        if (out->prefixlen > 128) {
-            return -1;
+            plen = plen * 10 + (*p - '0');
         }
-
-        vg_cidr_mask(out);
-        return 0;
     }
 
-    out->family = AF_INET;
+    out->family = strchr(tmp, ':') != NULL ? AF_INET6 : AF_INET;
+    max = out->family == AF_INET6 ? 128 : 32;
 
-    if (inet_pton(AF_INET, tmp, out->addr) != 1) {
+    if (inet_pton(out->family, tmp, out->addr) != 1 || plen > max) {
         return -1;
     }
 
-    out->prefixlen = (uint8_t) (plen < 0 ? 32 : plen);
-
-    if (out->prefixlen > 32) {
-        return -1;
-    }
-
+    out->prefixlen = (uint8_t) (plen < 0 ? max : plen);
     vg_cidr_mask(out);
     return 0;
 }

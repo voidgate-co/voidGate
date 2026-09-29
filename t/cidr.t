@@ -91,3 +91,39 @@ __DATA__
 === TEST 13: bad cidr is rejected
 --- input: drop 10.0.0.1/33
 --- expected: error: bad cidr
+
+
+
+=== TEST 14: prefix length 280 is not truncated to /24
+--- input: drop 10.0.0.0/280
+--- expected: error: bad cidr
+
+
+
+=== TEST 15: v6 prefix length 300 is not truncated to /44
+--- input: drop 2001:db8:5::/300
+--- expected: error: bad cidr
+
+
+
+=== TEST 16: empty prefix length is not /0
+--- input: drop 10.0.0.1/
+--- expected: error: bad cidr
+
+
+
+=== TEST 17: non-numeric prefix length is not /0
+--- input: drop 10.0.0.1/abc
+--- expected: error: bad cidr
+
+
+
+=== TEST 18: negative prefix length is not a host route
+--- input: drop 10.0.0.1/-8
+--- expected: error: bad cidr
+
+
+
+=== TEST 19: trailing garbage after prefix length is rejected
+--- input: drop 10.0.0.1/24x
+--- expected: error: bad cidr

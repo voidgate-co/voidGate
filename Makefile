@@ -28,7 +28,7 @@ CTL_OBJS  := src/voidgatectl.o
 
 .PHONY: all clean install install-lua test
 
-all: voidgate voidgatectl t/unit/policy
+all: voidgate voidgatectl t/unit/policy t/unit/cidr
 
 $(BPFDIR)/voidgate.bpf.o: $(BPFDIR)/voidgate.bpf.c $(BPFDIR)/voidgate.h
 	$(CLANG) $(BPF_CFLAGS) -c $< -o $@
@@ -56,18 +56,23 @@ t/unit/policy: t/unit/policy.c src/policy.c src/policy.h \
 		t/unit/policy.c src/policy.c src/config.o src/ipaddr.o \
 		src/log.o
 
-# Policy unit test, then XDP verdicts: real daemon + t/*.t (needs root).
+t/unit/cidr: t/unit/cidr.c src/config.o src/ipaddr.o src/log.o
+	$(CC) $(CFLAGS) -MF t/unit/cidr.d -o $@ t/unit/cidr.c src/config.o \
+		src/ipaddr.o src/log.o
+
+# Unit tests, then XDP verdicts: real daemon + t/*.t (needs root).
 test: all
 	./t/unit/policy
+	./t/unit/cidr
 	sudo t/bin/run
 
 clean:
-	rm -f voidgate voidgatectl t/unit/policy t/unit/policy.d \
+	rm -f voidgate voidgatectl t/unit/policy t/unit/cidr t/unit/*.d \
 		src/*.o src/*.d \
 		$(BPFDIR)/voidgate.bpf.o $(BPFDIR)/voidgate.bpf.d \
 		$(BPFDIR)/voidgate.skel.h
 
--include $(USER_OBJS:.o=.d) $(CTL_OBJS:.o=.d) t/unit/policy.d \
+-include $(USER_OBJS:.o=.d) $(CTL_OBJS:.o=.d) t/unit/policy.d t/unit/cidr.d \
 	 $(BPFDIR)/voidgate.bpf.d
 
 install: all

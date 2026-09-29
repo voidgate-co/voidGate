@@ -13,7 +13,7 @@ counters. No mocks, no `BPF_PROG_TEST_RUN`.
 ```sh
 sudo apt install libtest-base-perl   # once; pulls in Spiffy
 make
-make test                            # t/unit/policy + this suite
+make test                            # t/unit/* + this suite
 ```
 
 To run just this suite, or only some files, call the runner directly.
@@ -90,12 +90,13 @@ Everything test-related lives under `t/`. `prove -r t/` only picks up
 | `conf/xdp.conf` | daemon fixture for the `*.t` suite |
 | `conf/idle.conf` | never-wake fixture for `integration/daemon.sh` and `lua.sh` |
 | `unit/policy.c` | control-plane unit test, built as `t/unit/policy` by `make` (no root) |
+| `unit/cidr.c` | CIDR parser and config CIDR lists, built as `t/unit/cidr` (no root) |
 | `integration/daemon.sh` | daemon startup, detach, logging, pid file |
 | `integration/lua.sh` | Lua client (`lua.lua`) against a real daemon |
 | `integration/netns.sh` | veth flood: IDLE → ACTIVE wake and drop |
 | `bench/` | manual load generators (`hping3`, `pktgen`) from a netns; not tests |
 
-`make test` runs `t/unit/policy`, then `sudo t/bin/run`. The integration
+`make test` runs `t/unit/policy` and `t/unit/cidr`, then `sudo t/bin/run`. The integration
 scripts run separately, each with sudo:
 
 ```sh

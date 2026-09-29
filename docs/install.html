@@ -61,7 +61,7 @@ cd VoidGate
 make
 make test</code></pre>
         </div>
-        <p><code>make test</code> runs <code>t/unit/policy</code>, then <code>t/bin/run</code>: the real daemon on a veth pair in private namespaces, driven by the Perl Test::Base suite in <code>t/</code> (needs sudo). If a BPF change compiles but the daemon cannot load the object, the verifier rejected it — fix the program, do not weaken the test.</p>
+        <p><code>make test</code> runs the unit tests in <code>t/unit/</code>, then <code>t/bin/run</code>: the real daemon on a veth pair in private namespaces, driven by the Perl Test::Base suite in <code>t/</code> (needs sudo). If a BPF change compiles but the daemon cannot load the object, the verifier rejected it — fix the program, do not weaken the test.</p>
 
         <h2>Run</h2>
         <div class="code">

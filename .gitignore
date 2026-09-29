@@ -1,6 +1,7 @@
 voidgate
 voidgatectl
 t/unit/policy
+t/unit/cidr
 *.o
 *.d
 *~
