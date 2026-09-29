@@ -632,7 +632,12 @@ voidgate_xdp(struct xdp_md *ctx)
             goto v6_count;
         }
 
-        if (icmp6_type >= VG_NDISC_RS && icmp6_type <= VG_NDISC_REDIRECT) {
+        /* RFC 4861: real NDP is sent with hop limit 255 and the kernel drops
+         * anything else, so a routed NS/RA flood cannot use this exemption.
+         */
+        if (ip6->hop_limit == VG_NDISC_HOP_LIMIT
+            && icmp6_type >= VG_NDISC_RS && icmp6_type <= VG_NDISC_REDIRECT)
+        {
             goto v6_count;
         }
 

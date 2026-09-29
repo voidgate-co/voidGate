@@ -112,14 +112,23 @@ ipv6 udp [2001:db8::bad]:546 > [2001:db8::10]:547 ext=hopopts,dstopts
 
 === TEST 15: IPv6 extension preserves global-address NDP exemption
 --- setup: drop 2001:db8::bad/128
---- packets: ipv6 icmpv6 2001:db8::bad > 2001:db8::10 type=135 ext=dstopts
+--- packets
+ipv6 icmpv6 2001:db8::bad > 2001:db8::10 type=135 hop=255 ext=dstopts
 --- verdict: XDP_PASS
 
 
 
-=== TEST 16: truncated IPv6 extension from dropped src is XDP_DROP
+=== TEST 16: extension does not exempt NDP with hop limit below 255
 --- setup: drop 2001:db8::bad/128
 --- packets
-ipv6 icmpv6 2001:db8::bad > 2001:db8::10 type=135 ext=dstopts set@55=255
+ipv6 icmpv6 2001:db8::bad > 2001:db8::10 type=135 hop=64 ext=dstopts
+--- verdict: XDP_DROP
+
+
+
+=== TEST 17: truncated IPv6 extension from dropped src is XDP_DROP
+--- setup: drop 2001:db8::bad/128
+--- packets
+ipv6 icmpv6 2001:db8::bad > 2001:db8::10 type=135 hop=255 ext=dstopts set@55=255
 --- verdict: XDP_DROP
 --- counters: dropped=1 parse_err=1

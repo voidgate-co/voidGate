@@ -48,13 +48,13 @@ binaries.
 3. **Control plane decides drops; XDP only looks them up.** No
    thresholds in BPF.
 4. **Whitelist / NDP / SSH before drop.** Never drop IPv6 NDP (types
-   133–137), `fe80::/10`, `ff02::/16`, TCP `allow_ports` when the
-   **local** side is that port (`dport` + dest in `local_*`, or `sport` +
-   src in `local_*`), DHCP as an exact port pair to a local (or v4
-   broadcast) dest: UDP 67→68 or 68/67→67, DHCPv6 547→546 or
-   546/547→547. A remote source port of 22, 67, 68, 546 or 547 alone is
-   not a whitelist. Userspace must refuse a drop
-   CIDR that covers `local_*` or `allow_*`.
+   133–137 with hop limit 255), `fe80::/10`, `ff02::/16`, TCP
+   `allow_ports` when the **local** side is that port (`dport` + dest in
+   `local_*`, or `sport` + src in `local_*`), DHCP as an exact port pair
+   to a local (or v4 broadcast) dest: UDP 67→68 or 68/67→67, DHCPv6
+   547→546 or 546/547→547. A remote source port of 22, 67, 68, 546 or
+   547 alone is not a whitelist. Userspace must refuse a drop CIDR that
+   covers `local_*` or `allow_*`.
 5. **Do not blackhole the VM.** Drop attacker prefixes, not the local
    interface CIDR.
 6. **Do not clear `remote_*` on disarm.** BPF has no cheap hash flush.
@@ -108,8 +108,8 @@ sudo t/integration/daemon.sh
 sudo t/integration/lua.sh
 ```
 
-Needs clang, llvm, libbpf, bpftool, libelf, libtest-base-perl, root (or `CAP_BPF` +
-`CAP_NET_ADMIN`). Kernel 5.8+ with BTF.
+Needs clang, llvm, libbpf, bpftool, libelf, libtest-base-perl, root
+(or `CAP_BPF` + `CAP_NET_ADMIN`). Kernel 5.8+ with BTF.
 
 Attach: native (`XDP_FLAGS_DRV_MODE`) then SKB fallback. Tests attach in
 SKB mode to a veth pair and do not require a real NIC.

@@ -44,6 +44,7 @@
 #define VG_NDISC_NS  135
 #define VG_NDISC_NA  136
 #define VG_NDISC_REDIRECT  137
+#define VG_NDISC_HOP_LIMIT  255
 
 struct host_counters {
     __u64  in_pkts;
