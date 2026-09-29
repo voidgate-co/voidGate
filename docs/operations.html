@@ -34,203 +34,212 @@
         </div>
     </header>
 
-    <main id="main" class="wrap prose">
+    <main id="main" class="wrap doc">
         <header class="page-head">
             <p class="kicker">03 / operations</p>
             <h1>One line in. Text out.</h1>
             <p class="lede"><code>voidgatectl</code> talks to <code>/run/voidgate.sock</code>. Prometheus, if <code>metrics_port &gt; 0</code>, binds <code>127.0.0.1:9105/metrics</code>.</p>
         </header>
+        <div class="doc-body">
+            <nav class="toc" aria-label="On this page" hidden><p>On this page</p></nav>
+            <div class="prose">
+                <h2>voidgatectl</h2>
+                <div class="grid-table-wrap">
+                    <table class="grid-table">
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Effect</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>status</td>
+                                <td><code>state</code>, <code>armed</code>, <code>rx_pps</code>, <code>rx_bps</code>, drop count, iface</td>
+                            </tr>
+                            <tr>
+                                <td>stats</td>
+                                <td>XDP counters: <code>rx_pkts</code>, <code>passed</code>, <code>dropped</code>, <code>non_ip</code>, <code>map_full</code>, <code>parse_err</code></td>
+                            </tr>
+                            <tr>
+                                <td>drops</td>
+                                <td>installed prefixes with <code>reason</code> and age</td>
+                            </tr>
+                            <tr>
+                                <td>arm</td>
+                                <td><code>cfg.armed = 1</code>; re-baseline remote rate snapshots</td>
+                            </tr>
+                            <tr>
+                                <td>disarm</td>
+                                <td>flush <code>drop_*</code>, <code>cfg.armed = 0</code>, back to IDLE</td>
+                            </tr>
+                            <tr>
+                                <td>drop &lt;cidr&gt;</td>
+                                <td>manual insert; forces ACTIVE. Reason 1. Not auto-expired.</td>
+                            </tr>
+                            <tr>
+                                <td>undrop &lt;cidr&gt;</td>
+                                <td>remove one prefix from the drop tree</td>
+                            </tr>
+                            <tr>
+                                <td>reload</td>
+                                <td>re-read the config file; replace allow/local maps and ports</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <aside class="note idle"><code>reload</code> does not change the attached interface, XDP mode, map sizes, log or pid file, or the metrics listener. Those are fixed at start. Reload does lift any installed drop, manual ones included, that now covers a <code>local_*</code> or <code>allow_*</code> prefix.</aside>
+                <p>Drop reasons: <code>1</code> manual, <code>2</code> policy, <code>3</code> aggregate.</p>
 
-        <h2>voidgatectl</h2>
-        <div class="grid-table-wrap">
-            <table class="grid-table">
-                <thead>
-                    <tr>
-                        <th>Command</th>
-                        <th>Effect</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>status</td>
-                        <td><code>state</code>, <code>armed</code>, <code>rx_pps</code>, <code>rx_bps</code>, drop count, iface</td>
-                    </tr>
-                    <tr>
-                        <td>stats</td>
-                        <td>XDP counters: <code>rx_pkts</code>, <code>passed</code>, <code>dropped</code>, <code>non_ip</code>, <code>map_full</code>, <code>parse_err</code></td>
-                    </tr>
-                    <tr>
-                        <td>drops</td>
-                        <td>installed prefixes with <code>reason</code> and age</td>
-                    </tr>
-                    <tr>
-                        <td>arm</td>
-                        <td><code>cfg.armed = 1</code>; re-baseline remote rate snapshots</td>
-                    </tr>
-                    <tr>
-                        <td>disarm</td>
-                        <td>flush <code>drop_*</code>, <code>cfg.armed = 0</code>, back to IDLE</td>
-                    </tr>
-                    <tr>
-                        <td>drop &lt;cidr&gt;</td>
-                        <td>manual insert; forces ACTIVE. Reason 1. Not auto-expired.</td>
-                    </tr>
-                    <tr>
-                        <td>undrop &lt;cidr&gt;</td>
-                        <td>remove one prefix from the drop tree</td>
-                    </tr>
-                    <tr>
-                        <td>reload</td>
-                        <td>re-read the config file; replace allow/local maps and ports</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-        <aside class="note idle"><code>reload</code> does not change the attached interface, XDP mode, or map sizes. Those are fixed at start.</aside>
-        <p>Drop reasons: <code>1</code> manual, <code>2</code> policy, <code>3</code> aggregate.</p>
+                <h2>Config</h2>
+                <p>One <code>key = value</code> per line; <code>#</code> starts a comment. Every key is optional, and the defaults below are also what ships in <code>configs/voidgate.conf</code>. <a href="https://github.com/lynch1981/VoidGate/blob/main/configs/voidgate.conf">The commented file</a> explains each one in more depth.</p>
+                <div class="grid-table-wrap">
+                    <table class="grid-table config-table">
+                        <thead>
+                            <tr>
+                                <th>Key</th>
+                                <th>Default</th>
+                                <th>What it does</th>
+                                <th>reload</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="group">
+                                <td colspan="4">Interface and files</td>
+                            </tr>
+                            <tr>
+                                <td>interface</td>
+                                <td><code>eth0</code></td>
+                                <td>RX NIC to attach XDP to. <code>-i</code> overrides. Never <code>lo</code>.</td>
+                                <td class="rl-restart">restart</td>
+                            </tr>
+                            <tr>
+                                <td>xdp_mode</td>
+                                <td><code>auto</code></td>
+                                <td><code>auto</code> tries native driver XDP, then SKB. <code>native</code> / <code>skb</code> pin one.</td>
+                                <td class="rl-restart">restart</td>
+                            </tr>
+                            <tr>
+                                <td>log_file</td>
+                                <td><code>/var/log/voidgate.log</code></td>
+                                <td>Append-only log. Parent directory must exist.</td>
+                                <td class="rl-restart">restart</td>
+                            </tr>
+                            <tr>
+                                <td>pid_file</td>
+                                <td><code>/run/voidgate.pid</code></td>
+                                <td>Locked for the daemon's life; <code>-s stop</code> reads it.</td>
+                                <td class="rl-restart">restart</td>
+                            </tr>
+                            <tr class="group">
+                                <td colspan="4">Waking up</td>
+                            </tr>
+                            <tr>
+                                <td>wake_pps</td>
+                                <td><code>2000</code></td>
+                                <td>Aggregate NIC packets/s that arms the gate (IDLE → ACTIVE).</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr>
+                                <td>wake_mbps</td>
+                                <td><code>25</code></td>
+                                <td>Aggregate NIC Mbit/s that arms the gate. Either <code>wake_*</code> arms.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr>
+                                <td>idle_poll_ms</td>
+                                <td><code>1000</code></td>
+                                <td>Userspace tick in ms. <code>&lt;= 0</code> becomes 1000.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr>
+                                <td>clear_seconds</td>
+                                <td><code>30</code></td>
+                                <td>Quiet seconds, with an empty drop tree, before ACTIVE → IDLE.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr class="group">
+                                <td colspan="4">Dropping</td>
+                            </tr>
+                            <tr>
+                                <td>threshold_pps</td>
+                                <td><code>500</code></td>
+                                <td>Per-remote packets/s that earns a <code>/32</code> or <code>/128</code> drop. Keep below <code>wake_pps</code>.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr>
+                                <td>threshold_mbps</td>
+                                <td><code>5</code></td>
+                                <td>Per-remote Mbit/s, same effect. Keep below <code>wake_mbps</code>.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr>
+                                <td>ban_time</td>
+                                <td><code>1900</code></td>
+                                <td>Seconds a policy or aggregate drop lives. Manual drops never expire.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr>
+                                <td>aggregate_k</td>
+                                <td><code>8</code></td>
+                                <td>Dropped hosts in one <code>/24</code> or <code>/64</code> before the whole prefix is dropped.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr class="group">
+                                <td colspan="4">Never drop</td>
+                            </tr>
+                            <tr>
+                                <td>local_networks</td>
+                                <td><code>(auto)</code></td>
+                                <td>This VM's CIDRs. Empty takes the NIC's addresses as <code>/32</code> and <code>/128</code>. Don't list the on-link LAN prefix.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr>
+                                <td>allow_networks</td>
+                                <td><code>metadata, loopback, link-local</code></td>
+                                <td>Never-drop CIDRs. A non-empty list <em>replaces</em> the built-in one; it does not merge.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr>
+                                <td>allow_ports</td>
+                                <td><code>22</code></td>
+                                <td>TCP ports whitelisted on the local side. CSV, at most 8.</td>
+                                <td class="rl-live">live</td>
+                            </tr>
+                            <tr class="group">
+                                <td colspan="4">Capacity and metrics</td>
+                            </tr>
+                            <tr>
+                                <td>remote_map_size</td>
+                                <td><code>262144</code></td>
+                                <td>Cap on tracked attack sources (LRU, not preallocated).</td>
+                                <td class="rl-restart">restart</td>
+                            </tr>
+                            <tr>
+                                <td>drop_map_size</td>
+                                <td><code>65536</code></td>
+                                <td>Cap on drop-tree prefixes (not preallocated).</td>
+                                <td class="rl-restart">restart</td>
+                            </tr>
+                            <tr>
+                                <td>metrics_port</td>
+                                <td><code>9105</code></td>
+                                <td>Prometheus on <code>127.0.0.1</code>. <code>0</code> disables it.</td>
+                                <td class="rl-restart">restart</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><em>live</em>: <code>voidgatectl reload</code> applies it. <em>restart</em>: fixed when the daemon starts. The built-in allow list is <code>169.254.169.254/32</code>, <code>127.0.0.0/8</code>, <code>::1/128</code>, <code>fe80::/10</code>, <code>ff02::/16</code>.</p>
 
-        <h2>Config</h2>
-        <p>Key=value. Empty <code>local_networks</code> means auto-detect from the interface. A non-empty <code>allow_networks</code> replaces the built-in list (metadata, localhost, link-local).</p>
-        <div class="code">
-            <div class="code-head">
-                <span>configs/voidgate.conf</span>
-                <button type="button" class="copy">Copy</button>
-            </div>
-            <pre><code># voidGate configuration
-# Silent unless this VM's NIC is under DDoS. Control plane decides drops;
-# XDP enforces a prefix-tree drop list.
-
-# RX NIC for XDP. Packets are judged only on ingress; TX never runs this
-# program. Default eth0. -i overrides. A missing name exits before BPF
-# load. Do not attach to lo (local delivery never hits XDP). reload does
-# not move the attach.
-interface = eth0
-
-# auto: native driver XDP, then skb generic. native / skb pin one mode.
-# reload does not change mode.
-xdp_mode = auto
-
-# Aggregate NIC packets/sec from metrics.rx_pkts (every frame, including
-# drops). IDLE→ACTIVE when rx exceeds this or wake_mbps. Keep
-# threshold_pps below this so a flood split across sources still drops
-# those source IPs after arm.
-wake_pps = 2000
-
-# Aggregate NIC megabits/sec from metrics.rx_bytes. Either wake_* arms.
-# 25 Mbps is in the same ballpark as 2000 pps of MTU frames; small-packet
-# floods trip wake_pps first. 1000 Mbps is line rate on a 1G VM.
-wake_mbps = 25
-
-# Userspace tick period in milliseconds. XDP stays attached in IDLE;
-# this only polls coarse rx and, when ACTIVE, walks remotes. &lt;= 0
-# becomes 1000.
-idle_poll_ms = 1000
-
-# ACTIVE→IDLE after this many seconds of rx below both wake_* AND an
-# empty drop tree. Policy/aggregate prefixes must expire (ban_time)
-# first unless voidgatectl disarm.
-clear_seconds = 30
-
-# Per-remote packets/sec, ACTIVE only. Over this or threshold_mbps, drop
-# packets from that source IP (XDP_DROP): one IPv4 address (/32) or one
-# IPv6 address (/128). First sight of a source is a baseline; a rate
-# needs two ticks. Keep below wake_pps.
-threshold_pps = 500
-
-# Per-remote megabits/sec. Same drop as threshold_pps. Keep below
-# wake_mbps.
-threshold_mbps = 5
-
-# Seconds a policy or aggregate drop stays in the LPM tree. Manual
-# voidgatectl drop entries do not expire.
-ban_time = 1900
-
-# When this many dropped hosts sit in one IPv4 /24 or IPv6 /64, drop
-# that whole prefix too (reason=aggregate). Refused if the prefix covers
-# local_* or allow_*.
-aggregate_k = 8
-
-# This VM's CIDRs. Empty: take addresses from the XDP NIC as /32 and
-# /128 (skip loopback and fe80::/10) so LAN neighbors are not local.
-# Non-empty CSV replaces auto. Dest in local_* is inbound to this VM
-# (host/remote counters, allow_ports). Do not store the on-link LAN
-# prefix: neighbors would count as local and could not be dropped.
-local_networks =
-
-# Never-drop LPM. Non-empty CSV replaces the built-in list entirely
-# (it does not merge). Built-in: 169.254.169.254/32, 127.0.0.0/8,
-# ::1/128, fe80::/10, ff02::/16. XDP also hard-passes IPv6 NDP types
-# 133-137 with hop limit 255, and DHCP to this VM as an exact port pair:
-# UDP 67->68 or 68/67->67 (DHCPv6 547->546 or 546/547->547), dest local
-# or broadcast.
-allow_networks = 169.254.169.254/32, 127.0.0.0/8, ::1/128, fe80::/10, ff02::/16
-
-# TCP ports on the local side: dport with dest in local_*, or sport with
-# src in local_*. CSV, at most 8. A remote source port of 22 is not a
-# whitelist.
-allow_ports = 22
-
-# remote_v4 / remote_v6 LRU_PERCPU_HASH cap (attack sources, dest-local
-# only). BPF_F_NO_PREALLOC: this is a cap, not preallocated RAM. Set at
-# load; reload cannot grow it. Not flushed on disarm.
-remote_map_size = 262144
-
-# drop_v4 / drop_v6 LPM_TRIE cap. Same no-prealloc / reload rules.
-# Aggregation to /24 or /64 is the relief when this fills.
-drop_map_size = 65536
-
-# 0 disables HTTP. Otherwise bind 127.0.0.1 and serve GET /metrics only.
-metrics_port = 9105</code></pre>
-        </div>
-        <div class="grid-table-wrap">
-            <table class="grid-table">
-                <thead>
-                    <tr>
-                        <th>Key</th>
-                        <th>Role</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>wake_pps / wake_mbps</td>
-                        <td>NIC is on fire → arm the gate</td>
-                    </tr>
-                    <tr>
-                        <td>threshold_pps / threshold_mbps</td>
-                        <td>this remote is part of the attack → install a drop (keep below wake)</td>
-                    </tr>
-                    <tr>
-                        <td>clear_seconds</td>
-                        <td>quiet time required (with empty drop tree) to return IDLE</td>
-                    </tr>
-                    <tr>
-                        <td>ban_time</td>
-                        <td>seconds a policy/aggregate drop lives; manuals stay</td>
-                    </tr>
-                    <tr>
-                        <td>aggregate_k</td>
-                        <td>dropped hosts in a <code>/24</code> or <code>/64</code> before aggregating</td>
-                    </tr>
-                    <tr>
-                        <td>allow_ports</td>
-                        <td>TCP ports on the <em>local</em> side (default 22)</td>
-                    </tr>
-                    <tr>
-                        <td>metrics_port</td>
-                        <td><code>0</code> disables HTTP; otherwise localhost only</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h2>Prometheus</h2>
-        <p>When <code>metrics_port</code> is positive, the daemon listens on localhost and serves <code>GET /metrics</code>:</p>
-        <div class="code">
-            <div class="code-head">
-                <span>/metrics</span>
-                <button type="button" class="copy">Copy</button>
-            </div>
-            <pre><code># TYPE voidgate_armed gauge
+                <h2>Prometheus</h2>
+                <p>When <code>metrics_port</code> is positive, the daemon listens on localhost and serves <code>GET /metrics</code>:</p>
+                <div class="code">
+                    <div class="code-head">
+                        <span>/metrics</span>
+                        <button type="button" class="copy">Copy</button>
+                    </div>
+                    <pre><code># TYPE voidgate_armed gauge
 voidgate_armed 0
 # TYPE voidgate_rx_packets_total counter
 voidgate_rx_packets_total 0
@@ -244,22 +253,42 @@ voidgate_map_full_total 0
 voidgate_drop_prefixes 0
 # TYPE voidgate_rx_pps gauge
 voidgate_rx_pps 0</code></pre>
-        </div>
+                </div>
 
-        <h2>ACTIVE policy, short</h2>
-        <p>Each tick, remotes over threshold become <code>/32</code> or <code>/128</code>. Dense clusters become <code>/24</code> or <code>/64</code>. Userspace will not install a prefix that covers the VM itself or the allow list. On disarm, <code>remote_*</code> stays; the next arm re-baselines snapshots so leftover counters are not a phantom flood.</p>
-        <aside class="note warn">A remote source port of 22 is not SSH. Only the local side of <code>allow_ports</code> is whitelisted. Do not drop the interface CIDR.</aside>
+                <h2>Lua client</h2>
+                <p><code>lua/voidgate.lua</code> talks to the same socket from Lua 5.1–5.4 or LuaJIT, using LuaSocket's <code>socket.unix</code>. Install it with <code>sudo make install-lua LUA_VERSION=5.4</code>.</p>
+                <div class="code">
+                    <div class="code-head">
+                        <span>lua</span>
+                        <button type="button" class="copy">Copy</button>
+                    </div>
+                    <pre><code>local vg = require("voidgate")
+
+local status = assert(vg.status())
+print(status.state, status.armed, status.rx_pps)
+
+assert(vg.drop("203.0.113.0/24"))
+assert(vg.undrop("203.0.113.0/24"))</code></pre>
+                </div>
+                <p>Every method returns <code>nil, err</code> on a connection, timeout or daemon error. <code>stats()</code> returns 64-bit counters as decimal strings. Calls block with a one-second default timeout, so the client suits standard Lua hosts, not an OpenResty request loop.</p>
+
+                <h2>ACTIVE policy, short</h2>
+                <p>Each tick, remotes over threshold become <code>/32</code> or <code>/128</code>. Dense clusters become <code>/24</code> or <code>/64</code>. Userspace will not install a prefix that covers the VM itself or the allow list. On disarm, <code>remote_*</code> stays; the next arm re-baselines snapshots so leftover counters are not a phantom flood.</p>
+                <aside class="note warn">A remote source port of 22 is not SSH. Only the local side of <code>allow_ports</code> is whitelisted. Do not drop the interface CIDR.</aside>
+            </div>
+        </div>
     </main>
 
     <footer class="site-footer">
         <div class="wrap footer-inner">
             <div>
                 <strong>voidGate</strong>
-                <p>Multi-layer XDP shield for one Linux VM. Userspace Apache-2.0 · BPF GPL-2.0-only.</p>
+                <p>XDP DDoS shield for one Linux VM. Userspace Apache-2.0 · BPF GPL-2.0-only.</p>
                 <div class="footer-nav">
                     <a href="index.html">Home</a>
                     <a href="architecture.html">Architecture</a>
                     <a href="install.html">Install</a>
+                    <a href="operations.html">Operations</a>
                     <a href="https://github.com/lynch1981/VoidGate">Source</a>
                 </div>
             </div>

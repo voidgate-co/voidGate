@@ -34,154 +34,186 @@
         </div>
     </header>
 
-    <main id="main" class="wrap prose">
+    <main id="main" class="wrap doc">
         <header class="page-head">
             <p class="kicker">01 / architecture</p>
             <h1>Four layers. One verdict.</h1>
             <p class="lede">A multi-layer XDP shield. Userspace owns state. The program reads <code>cfg.armed</code> and, when armed, enforces a prefix-tree drop list. Thresholds do not live in BPF. Default verdict is <code>XDP_PASS</code>.</p>
         </header>
+        <div class="doc-body">
+            <nav class="toc" aria-label="On this page" hidden><p>On this page</p></nav>
+            <div class="prose">
+                <h2>Four layers</h2>
+                <ol class="pipeline">
+                    <li class="watch">
+                        <span class="layer-idx">01 · Watch</span>
+                        <h3>Count and pass</h3>
+                        <p>IDLE. XDP stays attached. <code>rx_*</code> then <code>XDP_PASS</code>. No Ethernet parse, no LPM, no host or remote maps. Arm on <code>wake_pps</code> / <code>wake_mbps</code> or ctl.</p>
+                    </li>
+                    <li class="keep">
+                        <span class="layer-idx">02 · Keep</span>
+                        <h3>Never drop the VM</h3>
+                        <p>Allow LPM, local-side TCP <code>allow_ports</code>, DHCP, IPv6 NDP 133–137 with hop limit 255, <code>fe80::/10</code>, <code>ff02::/16</code>. Userspace refuses a drop CIDR that covers <code>local_*</code> or <code>allow_*</code>.</p>
+                    </li>
+                    <li class="cut">
+                        <span class="layer-idx">03 · Cut</span>
+                        <h3>Drop the hosts</h3>
+                        <p>Drop LPM. A remote over <code>threshold_pps</code> / <code>threshold_mbps</code> becomes <code>/32</code> or <code>/128</code>. Manual <code>voidgatectl drop</code> is this layer and does not expire.</p>
+                    </li>
+                    <li class="widen">
+                        <span class="layer-idx">04 · Widen</span>
+                        <h3>Drop the cluster</h3>
+                        <p><code>aggregate_k</code> dropped hosts in a <code>/24</code> or <code>/64</code> install that prefix. Policy and aggregate live <code>ban_time</code> seconds. IPv4 and IPv6 together, always.</p>
+                    </li>
+                </ol>
 
-        <ol class="shield">
-            <li class="watch">
-                <span class="layer-idx">01</span>
-                <div>
-                    <h3>Watch</h3>
-                    <p>IDLE. XDP stays attached. <code>rx_*</code> then <code>XDP_PASS</code>. No Ethernet parse, no LPM, no host or remote maps. Arm on <code>wake_pps</code> / <code>wake_mbps</code> or ctl.</p>
+                <h2>Two planes</h2>
+                <div class="two">
+                    <article class="fact">
+                        <p class="tag">Data plane</p>
+                        <h3><code>src/bpf/voidgate.bpf.c</code></h3>
+                        <p>GPL-2.0-only XDP program. Verdicts are <code>XDP_PASS</code> or <code>XDP_DROP</code> only. No AF_XDP, no redirect, no userspace packet path.</p>
+                    </article>
+                    <article class="fact">
+                        <p class="tag">Control plane</p>
+                        <h3><code>src/voidgate.c</code> + <code>policy.c</code></h3>
+                        <p>Watches coarse rx rates, arms the gate, walks remote maps, and writes CIDRs into LPM drop tries. Apache-2.0.</p>
+                    </article>
                 </div>
-            </li>
-            <li class="keep">
-                <span class="layer-idx">02</span>
-                <div>
-                    <h3>Keep</h3>
-                    <p>Allow LPM, local-side TCP <code>allow_ports</code>, DHCP, IPv6 NDP 133–137 with hop limit 255 / <code>fe80::/10</code> / <code>ff02::/16</code>. Userspace refuses a drop CIDR that covers <code>local_*</code> or <code>allow_*</code>.</p>
-                </div>
-            </li>
-            <li class="cut">
-                <span class="layer-idx">03</span>
-                <div>
-                    <h3>Cut</h3>
-                    <p>Drop LPM. A remote over <code>threshold_pps</code> / <code>threshold_mbps</code> becomes <code>/32</code> or <code>/128</code>. Manual <code>voidgatectl drop</code> is this layer and does not expire.</p>
-                </div>
-            </li>
-            <li class="widen">
-                <span class="layer-idx">04</span>
-                <div>
-                    <h3>Widen</h3>
-                    <p><code>aggregate_k</code> dropped hosts in a <code>/24</code> or <code>/64</code> install that prefix. Policy and aggregate live <code>ban_time</code> seconds. IPv4 and IPv6 together, always.</p>
-                </div>
-            </li>
-        </ol>
 
-        <h2>Two planes</h2>
-        <div class="two">
-            <article class="fact">
-                <p class="tag">Data plane</p>
-                <h3><code>src/bpf/voidgate.bpf.c</code></h3>
-                <p>GPL-2.0-only XDP program. Verdicts are <code>XDP_PASS</code> or <code>XDP_DROP</code> only. No AF_XDP, no redirect, no userspace packet path.</p>
-            </article>
-            <article class="fact">
-                <p class="tag">Control plane</p>
-                <h3><code>src/voidgate.c</code> + <code>policy.c</code></h3>
-                <p>Watches coarse rx rates, arms the gate, walks remote maps, and writes CIDRs into LPM drop tries. Apache-2.0.</p>
-            </article>
+                <h2>Idle datapath</h2>
+                <p>The cheap path is the product. On every packet the program bumps <code>metrics.rx_pkts</code> / <code>rx_bytes</code>, loads <code>cfg.armed</code>, and if it is zero returns <code>XDP_PASS</code>. It must not parse Ethernet, must not LPM, and must not touch host or remote maps.</p>
+                <aside class="note ok">XDP stays attached in IDLE. Arming is <code>cfg.armed = 1</code>, not attach/detach. Detach only on process exit.</aside>
+
+                <h2>Armed packet path</h2>
+                <p>Whitelist checks run <strong>before</strong> the drop tree. Default verdict is still <code>XDP_PASS</code>.</p>
+                <ol class="path">
+                    <li><strong>Parse</strong> — Ethernet, up to two VLAN tags, then IPv4 or IPv6. Non-IP is counted and passed. Bad or truncated headers increment <code>parse_err</code>. If the source and destination addresses are still readable (a bad IPv4 IHL, a truncated IPv6 extension), the drop tree still applies but no port exemption does; only a header too short to hold the addresses is passed unjudged.</li>
+                    <li><strong>IPv6 hard-pass</strong> — <code>fe80::/10</code>, <code>ff02::/16</code>, and ICMPv6 NDP types 133–137 with hop limit 255 skip the drop tree (routed traffic arrives below 255, so an off-link flood cannot use the exemption). IPv4 has no extra hard-pass here; link-local v4 is an allow-list entry.</li>
+                    <li><strong>Allow LPM</strong> — source or destination in <code>allow_v4</code> / <code>allow_v6</code> skips the drop tree.</li>
+                    <li><strong>TCP allow_ports</strong> — only when the <em>local</em> side is that port: <code>dport</code> and dest in <code>local_*</code>, or <code>sport</code> and src in <code>local_*</code>. A remote source port of 22 is not a whitelist hit.</li>
+                    <li><strong>DHCP</strong> — exact port pair to this VM: UDP 67→68 or 68/67→67, DHCPv6 547→546 or 546/547→547. A remote source port alone is not a whitelist.</li>
+                    <li class="drop-step"><strong>Drop LPM</strong> — source or destination in <code>drop_v4</code> / <code>drop_v6</code> returns <code>XDP_DROP</code>.</li>
+                    <li><strong>Count, then pass</strong> — inbound to a local dest updates <code>host_*</code> and <code>remote_*</code>; outbound from a local src updates <code>host_*</code>.</li>
+                </ol>
+
+                <h2>Maps</h2>
+                <p>LPM lookup keys use prefixlen 32 or 128 for a host query. LPM_TRIE maps are created with <code>BPF_F_NO_PREALLOC</code>.</p>
+                <div class="grid-table-wrap">
+                    <table class="grid-table">
+                        <thead>
+                            <tr>
+                                <th>Map</th>
+                                <th>Type</th>
+                                <th>Written when</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>cfg</td>
+                                <td>ARRAY[1]</td>
+                                <td>userspace</td>
+                                <td><code>armed</code>, <code>allow_ports</code></td>
+                            </tr>
+                            <tr>
+                                <td>metrics</td>
+                                <td>PERCPU_ARRAY[1]</td>
+                                <td>always (rx); armed (dropped, …)</td>
+                                <td>userspace sums CPUs</td>
+                            </tr>
+                            <tr>
+                                <td>drop_v4 / drop_v6</td>
+                                <td>LPM_TRIE</td>
+                                <td>ACTIVE</td>
+                                <td>empty in IDLE after disarm</td>
+                            </tr>
+                            <tr>
+                                <td>allow_v4 / allow_v6</td>
+                                <td>LPM_TRIE</td>
+                                <td>start / reload</td>
+                                <td>metadata, localhost, link-local by default</td>
+                            </tr>
+                            <tr>
+                                <td>local_v4 / local_v6</td>
+                                <td>LPM_TRIE</td>
+                                <td>start / reload</td>
+                                <td>this VM’s CIDRs</td>
+                            </tr>
+                            <tr>
+                                <td>host_v4 / host_v6</td>
+                                <td>PERCPU_HASH</td>
+                                <td>armed</td>
+                                <td>local IPs</td>
+                            </tr>
+                            <tr>
+                                <td>remote_v4 / remote_v6</td>
+                                <td>LRU_PERCPU_HASH</td>
+                                <td>armed</td>
+                                <td>attack sources; not flushed on disarm</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2>Idle ↔ Active</h2>
+                <div class="state-diagram">
+                    <article class="state idle">
+                        <p class="state-name">Idle</p>
+                        <p class="state-flag"><code>cfg.armed = 0</code></p>
+                        <ul>
+                            <li>XDP attached, coarse rx counters only</li>
+                            <li>No drop tree, no per-source maps</li>
+                            <li>Userspace polls every <code>idle_poll_ms</code></li>
+                        </ul>
+                    </article>
+                    <div class="transitions">
+                        <div class="transition to-active">
+                            <span class="t-label">arm</span>
+                            <svg viewBox="0 0 160 12" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="6" x2="150" y2="6"/><path d="M148 1 L158 6 L148 11 Z"/></svg>
+                            <span class="t-cond"><code>wake_pps</code> / <code>wake_mbps</code> exceeded, or <code>ctl arm</code> / <code>drop</code></span>
+                        </div>
+                        <div class="transition to-idle">
+                            <span class="t-label">disarm</span>
+                            <svg viewBox="0 0 160 12" preserveAspectRatio="none" aria-hidden="true"><line x1="10" y1="6" x2="160" y2="6"/><path d="M12 1 L2 6 L12 11 Z"/></svg>
+                            <span class="t-cond">quiet for <code>clear_seconds</code> and drop tree empty, or <code>ctl disarm</code></span>
+                        </div>
+                    </div>
+                    <article class="state active">
+                        <p class="state-name">Active</p>
+                        <p class="state-flag"><code>cfg.armed = 1</code></p>
+                        <ul>
+                            <li>Parse IPv4/IPv6, whitelist, drop LPM</li>
+                            <li>Top remotes → <code>/32</code> or <code>/128</code></li>
+                            <li>Dense clusters → <code>/24</code> or <code>/64</code></li>
+                        </ul>
+                    </article>
+                </div>
+
+                <h2>Policy, once a second</h2>
+                <p>In ACTIVE, userspace walks remotes. A source over <code>threshold_pps</code> or <code>threshold_mbps</code> is inserted as <code>/32</code> or <code>/128</code> (<code>reason=policy</code>). If at least <code>aggregate_k</code> dropped hosts sit in the same <code>/24</code> or <code>/64</code>, that prefix is inserted too (<code>reason=aggregate</code>). Policy and aggregate drops expire after <code>ban_time</code>. Manual drops do not.</p>
+                <p>ACTIVE returns to IDLE when the NIC has been quiet for <code>clear_seconds</code> <em>and</em> the drop tree is empty. <code>voidgatectl drop</code> forces ACTIVE. <code>voidgatectl disarm</code> flushes drops and returns IDLE.</p>
+
+                <h2>Do not blackhole the VM</h2>
+                <ul class="checks">
+                    <li>Drop attacker prefixes, not the local interface CIDR.</li>
+                    <li>Userspace refuses a drop CIDR that covers <code>local_*</code> or <code>allow_*</code>.</li>
+                    <li>Whitelist / NDP / SSH / DHCP run before drop.</li>
+                    <li>Shared NIC: this is not a SPAN tap. No promiscuous mode in v1.</li>
+                    <li>IPv4 and IPv6 together. Dual LPM, dual host maps, dual remote maps.</li>
+                </ul>
+            </div>
         </div>
-
-        <h2>Idle datapath</h2>
-        <p>The cheap path is the product. On every packet the program bumps <code>metrics.rx_pkts</code> / <code>rx_bytes</code>, loads <code>cfg.armed</code>, and if it is zero returns <code>XDP_PASS</code>. It must not parse Ethernet, must not LPM, and must not touch host or remote maps.</p>
-        <aside class="note ok">XDP stays attached in IDLE. Arming is <code>cfg.armed = 1</code>, not attach/detach. Detach only on process exit.</aside>
-
-        <h2>Armed packet path</h2>
-        <p>Whitelist checks run <strong>before</strong> the drop tree. Default verdict is still <code>XDP_PASS</code>.</p>
-        <ol class="path">
-            <li><strong>Parse</strong> — Ethernet, up to two VLAN tags, then IPv4 or IPv6. Non-IP is counted and passed. Bad or truncated headers increment <code>parse_err</code>. If the source and destination addresses are still readable (a bad IPv4 IHL, a truncated IPv6 extension), the drop tree still applies but no port exemption does; only a header too short to hold the addresses is passed unjudged.</li>
-            <li><strong>IPv6 hard-pass</strong> — <code>fe80::/10</code>, <code>ff02::/16</code>, and ICMPv6 NDP types 133–137 with hop limit 255 skip the drop tree (routed traffic arrives below 255, so an off-link flood cannot use the exemption). IPv4 has no extra hard-pass here; link-local v4 is an allow-list entry.</li>
-            <li><strong>Allow LPM</strong> — source or destination in <code>allow_v4</code> / <code>allow_v6</code> skips the drop tree.</li>
-            <li><strong>TCP allow_ports</strong> — only when the <em>local</em> side is that port: <code>dport</code> and dest in <code>local_*</code>, or <code>sport</code> and src in <code>local_*</code>. A remote source port of 22 is not a whitelist hit.</li>
-            <li><strong>DHCP</strong> — exact port pair to this VM: UDP 67→68 or 68/67→67, DHCPv6 547→546 or 546/547→547. A remote source port alone is not a whitelist.</li>
-            <li class="drop-step"><strong>Drop LPM</strong> — source or destination in <code>drop_v4</code> / <code>drop_v6</code> returns <code>XDP_DROP</code>.</li>
-            <li><strong>Count, then pass</strong> — inbound to a local dest updates <code>host_*</code> and <code>remote_*</code>; outbound from a local src updates <code>host_*</code>.</li>
-        </ol>
-
-        <h2>Maps</h2>
-        <p>LPM lookup keys use prefixlen 32 or 128 for a host query. LPM_TRIE maps are created with <code>BPF_F_NO_PREALLOC</code>.</p>
-        <div class="grid-table-wrap">
-            <table class="grid-table">
-                <thead>
-                    <tr>
-                        <th>Map</th>
-                        <th>Type</th>
-                        <th>Written when</th>
-                        <th>Notes</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>cfg</td>
-                        <td>ARRAY[1]</td>
-                        <td>userspace</td>
-                        <td><code>armed</code>, <code>allow_ports</code></td>
-                    </tr>
-                    <tr>
-                        <td>metrics</td>
-                        <td>PERCPU_ARRAY[1]</td>
-                        <td>always (rx); armed (dropped, …)</td>
-                        <td>userspace sums CPUs</td>
-                    </tr>
-                    <tr>
-                        <td>drop_v4 / drop_v6</td>
-                        <td>LPM_TRIE</td>
-                        <td>ACTIVE</td>
-                        <td>empty in IDLE after disarm</td>
-                    </tr>
-                    <tr>
-                        <td>allow_v4 / allow_v6</td>
-                        <td>LPM_TRIE</td>
-                        <td>start / reload</td>
-                        <td>metadata, localhost, link-local by default</td>
-                    </tr>
-                    <tr>
-                        <td>local_v4 / local_v6</td>
-                        <td>LPM_TRIE</td>
-                        <td>start / reload</td>
-                        <td>this VM’s CIDRs</td>
-                    </tr>
-                    <tr>
-                        <td>host_v4 / host_v6</td>
-                        <td>PERCPU_HASH</td>
-                        <td>armed</td>
-                        <td>local IPs</td>
-                    </tr>
-                    <tr>
-                        <td>remote_v4 / remote_v6</td>
-                        <td>LRU_PERCPU_HASH</td>
-                        <td>armed</td>
-                        <td>attack sources; not flushed on disarm</td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
-
-        <h2>Policy, once a second</h2>
-        <p>In ACTIVE, userspace walks remotes. A source over <code>threshold_pps</code> or <code>threshold_mbps</code> is inserted as <code>/32</code> or <code>/128</code> (<code>reason=policy</code>). If at least <code>aggregate_k</code> dropped hosts sit in the same <code>/24</code> or <code>/64</code>, that prefix is inserted too (<code>reason=aggregate</code>). Policy and aggregate drops expire after <code>ban_time</code>. Manual drops do not.</p>
-        <p>ACTIVE returns to IDLE when the NIC has been quiet for <code>clear_seconds</code> <em>and</em> the drop tree is empty. <code>voidgatectl drop</code> forces ACTIVE. <code>voidgatectl disarm</code> flushes drops and returns IDLE.</p>
-
-        <h2>Do not blackhole the VM</h2>
-        <ul class="checks">
-            <li>Drop attacker prefixes, not the local interface CIDR.</li>
-            <li>Userspace refuses a drop CIDR that covers <code>local_*</code> or <code>allow_*</code>.</li>
-            <li>Whitelist / NDP / SSH / DHCP run before drop.</li>
-            <li>Shared NIC: this is not a SPAN tap. No promiscuous mode in v1.</li>
-            <li>IPv4 and IPv6 together. Dual LPM, dual host maps, dual remote maps.</li>
-        </ul>
     </main>
 
     <footer class="site-footer">
         <div class="wrap footer-inner">
             <div>
                 <strong>voidGate</strong>
-                <p>Multi-layer XDP shield for one Linux VM. Userspace Apache-2.0 · BPF GPL-2.0-only.</p>
+                <p>XDP DDoS shield for one Linux VM. Userspace Apache-2.0 · BPF GPL-2.0-only.</p>
                 <div class="footer-nav">
                     <a href="index.html">Home</a>
+                    <a href="architecture.html">Architecture</a>
                     <a href="install.html">Install</a>
                     <a href="operations.html">Operations</a>
                     <a href="https://github.com/lynch1981/VoidGate">Source</a>

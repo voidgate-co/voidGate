@@ -3,13 +3,13 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>voidGate — multi-layer XDP shield</title>
-    <meta name="description" content="Multi-layer XDP shield for a single Linux VM. Silent unless the instance is under attack. XDP_PASS or XDP_DROP only.">
+    <title>voidGate — drop DDoS floods at the NIC</title>
+    <meta name="description" content="voidGate protects a single Linux VM from DDoS floods with XDP. Idle it only counts packets; under attack it drops the sources in the kernel. IPv4 and IPv6.">
     <meta name="theme-color" content="#05060a">
     <link rel="icon" href="img/favicon.svg" type="image/svg+xml">
     <link rel="canonical" href="https://lynch1981.github.io/VoidGate/">
     <meta property="og:title" content="voidGate">
-    <meta property="og:description" content="Multi-layer XDP shield for one Linux VM. Silent unless the instance is under attack.">
+    <meta property="og:description" content="Drop DDoS floods at the NIC. Stay out of the way until then. XDP shield for one Linux VM.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://lynch1981.github.io/VoidGate/">
     <link rel="preload" href="fonts/ibm-plex-sans-400.woff2" as="font" type="font/woff2" crossorigin>
@@ -36,21 +36,44 @@
 
     <main id="main">
         <section class="hero wrap">
-            <p class="kicker">XDP · multi-layer shield · idle until the NIC is on fire</p>
-            <h1 class="display">voidGate</h1>
-            <p class="lede">A multi-layer XDP shield for a single Linux VM. Silent unless the instance is under attack. Packets stay in the kernel: <code>XDP_PASS</code> or <code>XDP_DROP</code>. IPv4 and IPv6 together.</p>
-            <div class="hero-actions">
-                <a class="btn btn-pass" href="install.html">Build &amp; run</a>
-                <a class="btn btn-ghost" href="architecture.html">How it decides</a>
+            <div class="hero-copy">
+                <p class="kicker">XDP DDoS shield · one Linux VM</p>
+                <h1 class="display">Drop floods at the NIC. Stay out of the way until then.</h1>
+                <p class="lede">voidGate guards a single Linux VM. While traffic is normal, its XDP program only counts packets and passes them. When the NIC floods, it arms, finds the sources, and drops them in the kernel, before the network stack sees them. IPv4 and IPv6 together.</p>
+                <div class="hero-actions">
+                    <a class="btn btn-pass" href="install.html">Build &amp; run</a>
+                    <a class="btn btn-ghost" href="architecture.html">How it decides</a>
+                </div>
+                <ul class="chips" aria-label="At a glance">
+                    <li>Linux 5.8+ · BTF</li>
+                    <li>IPv4 + IPv6</li>
+                    <li>XDP_PASS or XDP_DROP only</li>
+                    <li>Apache-2.0 · BPF GPL-2.0</li>
+                </ul>
+            </div>
+            <div class="code hero-code">
+                <div class="code-head">
+                    <span>quickstart</span>
+                    <button type="button" class="copy">Copy</button>
+                </div>
+                <pre><code>git clone https://github.com/lynch1981/VoidGate.git
+cd VoidGate
+make
+sudo ./voidgate -c configs/voidgate.conf -i eth0
+sudo ./voidgatectl status</code></pre>
+                <p class="code-foot">Needs clang, libbpf, bpftool. <a href="install.html">Full requirements</a></p>
             </div>
         </section>
 
         <div class="wrap">
-            <section class="datapath" data-gate tabindex="0" aria-label="Datapath visualization">
+            <section class="datapath" data-gate tabindex="0" aria-labelledby="datapath-title">
                 <div class="datapath-head">
-                    <div class="seg" role="tablist" aria-label="Gate state">
-                        <button type="button" role="tab" data-arm="0" aria-selected="true">Idle</button>
-                        <button type="button" role="tab" data-arm="1" aria-selected="false">Active</button>
+                    <div>
+                        <h2 id="datapath-title" class="datapath-title">What happens to each packet</h2>
+                        <div class="seg" role="tablist" aria-label="Gate state">
+                            <button type="button" role="tab" data-arm="0" aria-selected="true">Idle</button>
+                            <button type="button" role="tab" data-arm="1" aria-selected="false">Under attack</button>
+                        </div>
                     </div>
                     <dl class="metrics">
                         <div>
@@ -72,149 +95,337 @@
                     </dl>
                 </div>
                 <div class="datapath-body">
-                    <ol class="stages">
-                        <li data-stage="nic">NIC</li>
-                        <li data-stage="rx">rx++</li>
-                        <li data-stage="parse" class="armed-only">parse</li>
-                        <li data-stage="allow" class="armed-only">allow</li>
-                        <li data-stage="drop" class="armed-only">drop LPM</li>
-                        <li data-stage="count" class="armed-only">count</li>
-                        <li data-stage="pass" class="verdict pass">XDP_PASS</li>
-                        <li data-stage="dropv" class="verdict drop armed-only">XDP_DROP</li>
-                    </ol>
-                    <div class="datapath-lane" aria-hidden="true"></div>
+                    <svg class="flow flow-wide" viewBox="0 0 1000 336" role="img" aria-label="Packet path through voidGate. Idle: rx counter, then XDP_PASS with no parsing. Active: parse, then allowed traffic passes early, drop-tree matches are dropped, everything else is counted and passed. A userspace policy reads the counters, identifies attackers, and puts them in the drop tree.">
+                        <defs>
+                            <marker id="w-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="w-ah-idle" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-idle" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="w-ah-keep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-keep" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="w-ah-drop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-drop" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="w-ah-feed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-feed" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="w-ah-pass" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-pass" d="M0 0 L10 5 L0 10 Z"/></marker>
+                        </defs>
+                        <g class="lanes">
+                            <g class="idle-only">
+                                <path class="e e-idle" d="M262 148 V52 H960 V148" marker-end="url(#w-ah-idle)"/>
+                                <text class="el" x="270" y="120">no</text>
+                                <text class="cap cap-idle" x="611" y="42">idle: rx++ then XDP_PASS · no parse, no lookups</text>
+                            </g>
+                            <g class="armed-only">
+                                <path class="e e-keep" d="M504 146 V100 H890 V148" marker-end="url(#w-ah-keep)"/>
+                                <text class="el" x="512" y="126">hit</text>
+                                <text class="cap cap-keep" x="697" y="90">allow LPM · local allow_ports · DHCP · IPv6 NDP</text>
+                                <path class="e e-drop" d="M660 194 V242" marker-end="url(#w-ah-drop)"/>
+                                <text class="el" x="652" y="224" text-anchor="end">match</text>
+                                <rect class="region" x="734" y="244" width="262" height="84" rx="10"/>
+                                <text class="region-lbl" x="742" y="320">userspace</text>
+                                <path class="e e-feed" d="M790 190 V254" marker-end="url(#w-ah-feed)"/>
+                                <text class="el" x="798" y="226">per-source counters</text>
+                                <path class="e e-install" d="M740 278 H728 V182 H690" marker-end="url(#w-ah-drop)"/>
+                                <text class="el el-drop" x="722" y="232" text-anchor="end">installs</text>
+                            </g>
+                        </g>
+                        <g class="edges">
+                            <path class="e" d="M88 170 H110" marker-end="url(#w-ah)"/>
+                            <path class="e" d="M188 170 H216" marker-end="url(#w-ah)"/>
+                            <g class="armed-only">
+                                <path class="e" d="M306 170 H344" marker-end="url(#w-ah)"/>
+                                <text class="el" x="326" y="162" text-anchor="middle">yes</text>
+                                <path class="e" d="M422 170 H450" marker-end="url(#w-ah)"/>
+                                <path class="e" d="M556 170 H606" marker-end="url(#w-ah)"/>
+                                <text class="el" x="582" y="162" text-anchor="middle">miss</text>
+                                <path class="e" d="M712 170 H750" marker-end="url(#w-ah)"/>
+                                <text class="el" x="732" y="162" text-anchor="middle">miss</text>
+                                <path class="e e-pass" d="M828 170 H858" marker-end="url(#w-ah-pass)"/>
+                            </g>
+                        </g>
+                        <g class="nodes">
+                            <g class="node"><rect x="12" y="150" width="76" height="40" rx="6"/><text class="lbl" x="50" y="170">NIC</text></g>
+                            <g class="node"><rect x="112" y="150" width="76" height="40" rx="6"/><text class="lbl" x="150" y="170">rx++</text><text class="sub" x="150" y="212">metrics.rx_*</text></g>
+                            <g class="node"><polygon points="262,148 306,170 262,192 218,170"/><text class="lbl" x="262" y="170">armed?</text></g>
+                            <g class="node armed-only"><rect x="346" y="150" width="76" height="40" rx="6"/><text class="lbl" x="384" y="170">parse</text><text class="sub" x="384" y="212">eth · vlan · ip</text></g>
+                            <g class="node armed-only"><polygon points="504,146 556,170 504,194 452,170"/><text class="lbl" x="504" y="170">allowed?</text><text class="sub" x="504" y="214">never-drop rules</text></g>
+                            <g class="node armed-only"><polygon points="660,146 712,170 660,194 608,170"/><text class="lbl" x="660" y="170">drop LPM?</text></g>
+                            <g class="node node-count armed-only"><rect x="752" y="150" width="76" height="40" rx="6"/><text class="lbl" x="790" y="170">count</text></g>
+                            <g class="node node-policy armed-only"><rect x="740" y="256" width="150" height="44" rx="6"/><text class="lbl" x="815" y="272">smart policy</text><text class="sub" x="815" y="290">identifies attackers</text></g>
+                            <g class="node verdict verdict-pass"><rect x="860" y="150" width="128" height="40" rx="6"/><text class="lbl" x="924" y="170">XDP_PASS</text></g>
+                            <g class="node verdict verdict-drop armed-only"><rect x="610" y="244" width="100" height="40" rx="6"/><text class="lbl" x="660" y="264">XDP_DROP</text></g>
+                        </g>
+                        <g class="routes" aria-hidden="true">
+                            <path data-route="idle" d="M12 170 H262 V52 H960 V170"/>
+                            <path data-route="keep" d="M12 170 H504 V100 H890 V170"/>
+                            <path data-route="drop" d="M12 170 H660 V264"/>
+                            <path data-route="pass" data-count-at="778" d="M12 170 H924"/>
+                            <path data-route="feed" d="M790 170 V278"/>
+                        </g>
+                        <g class="pkts"></g>
+                    </svg>
+                    <svg class="flow flow-tall" viewBox="0 0 360 610" role="img" aria-label="Packet path through voidGate. Idle: rx counter, then XDP_PASS with no parsing. Active: parse, then allowed traffic passes early, drop-tree matches are dropped, everything else is counted and passed. A userspace policy reads the counters, identifies attackers, and puts them in the drop tree.">
+                        <defs>
+                            <marker id="t-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="t-ah-idle" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-idle" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="t-ah-keep" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-keep" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="t-ah-drop" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-drop" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="t-ah-feed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-feed" d="M0 0 L10 5 L0 10 Z"/></marker>
+                            <marker id="t-ah-pass" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="ah-pass" d="M0 0 L10 5 L0 10 Z"/></marker>
+                        </defs>
+                        <g class="lanes">
+                            <g class="idle-only">
+                                <path class="e e-idle" d="M94 160 H20 V590 H110 V562" marker-end="url(#t-ah-idle)"/>
+                                <text class="el" x="80" y="152" text-anchor="end">no</text>
+                            </g>
+                            <g class="armed-only">
+                                <path class="e e-keep" d="M90 296 H44 V540 H58" marker-end="url(#t-ah-keep)"/>
+                                <text class="el" x="80" y="288" text-anchor="end">hit</text>
+                                <path class="e e-drop" d="M210 376 H250" marker-end="url(#t-ah-drop)"/>
+                                <text class="el" x="231" y="368" text-anchor="middle">match</text>
+                                <rect class="region" x="218" y="416" width="136" height="76" rx="10"/>
+                                <text class="region-lbl" x="226" y="484">userspace</text>
+                                <path class="e e-feed" d="M190 446 H224" marker-end="url(#t-ah-feed)"/>
+                                <path class="e e-install" d="M240 426 V392 H178" marker-end="url(#t-ah-drop)"/>
+                            </g>
+                        </g>
+                        <g class="edges">
+                            <path class="e" d="M150 48 V70" marker-end="url(#t-ah)"/>
+                            <path class="e" d="M150 108 V134" marker-end="url(#t-ah)"/>
+                            <g class="armed-only">
+                                <path class="e" d="M150 184 V206" marker-end="url(#t-ah)"/>
+                                <text class="el" x="158" y="198">yes</text>
+                                <path class="e" d="M150 244 V268" marker-end="url(#t-ah)"/>
+                                <path class="e" d="M150 322 V348" marker-end="url(#t-ah)"/>
+                                <text class="el" x="158" y="338">miss</text>
+                                <path class="e" d="M150 402 V426" marker-end="url(#t-ah)"/>
+                                <text class="el" x="158" y="417">miss</text>
+                                <path class="e e-pass" d="M150 464 V518" marker-end="url(#t-ah-pass)"/>
+                            </g>
+                        </g>
+                        <g class="nodes">
+                            <g class="node"><rect x="110" y="12" width="80" height="36" rx="6"/><text class="lbl" x="150" y="30">NIC</text></g>
+                            <g class="node"><rect x="110" y="72" width="80" height="36" rx="6"/><text class="lbl" x="150" y="90">rx++</text><text class="sub sub-side" x="200" y="90">metrics.rx_*</text></g>
+                            <g class="node"><polygon points="150,136 206,160 150,184 94,160"/><text class="lbl" x="150" y="160">armed?</text></g>
+                            <g class="node armed-only"><rect x="110" y="208" width="80" height="36" rx="6"/><text class="lbl" x="150" y="226">parse</text><text class="sub sub-side" x="200" y="226">eth · vlan · ip</text></g>
+                            <g class="node armed-only"><polygon points="150,270 210,296 150,322 90,296"/><text class="lbl" x="150" y="296">allowed?</text></g>
+                            <g class="node armed-only"><polygon points="150,350 210,376 150,402 90,376"/><text class="lbl" x="150" y="376">drop LPM?</text></g>
+                            <g class="node node-count armed-only"><rect x="110" y="428" width="80" height="36" rx="6"/><text class="lbl" x="150" y="446">count</text></g>
+                            <g class="node node-policy armed-only"><rect x="226" y="426" width="120" height="40" rx="6"/><text class="lbl" x="286" y="446">smart policy</text></g>
+                            <g class="node verdict verdict-pass"><rect x="60" y="520" width="180" height="40" rx="6"/><text class="lbl" x="150" y="540">XDP_PASS</text></g>
+                            <g class="node verdict verdict-drop armed-only"><rect x="252" y="356" width="96" height="40" rx="6"/><text class="lbl" x="300" y="376">XDP_DROP</text></g>
+                        </g>
+                        <g class="routes" aria-hidden="true">
+                            <path data-route="idle" d="M150 12 V160 H20 V590 H110 V540"/>
+                            <path data-route="keep" d="M150 12 V296 H44 V540 H150"/>
+                            <path data-route="drop" d="M150 12 V376 H300"/>
+                            <path data-route="pass" data-count-at="434" d="M150 12 V540"/>
+                            <path data-route="feed" d="M150 446 H286"/>
+                        </g>
+                        <g class="pkts"></g>
+                    </svg>
                 </div>
-                <p class="datapath-note">On-page visualization of <code>voidgate.bpf.c</code>. Not live telemetry. Keys: I idle, A active.</p>
+                <div class="datapath-foot">
+                    <ul class="flow-legend" aria-label="Packet kinds">
+                        <li class="k-legit">client traffic</li>
+                        <li class="k-attack">flood source</li>
+                        <li class="k-keep">SSH · NDP · metadata</li>
+                    </ul>
+                    <p class="datapath-note">A simulation of <code>voidgate.bpf.c</code>, not live telemetry. In idle only <code>rx_*</code> moves, even for flood sources. Under attack, <code>count</code> feeds a userspace policy that identifies attackers and puts them in the drop LPM. Keys: I idle, A active.</p>
+                </div>
+                <ol class="pkt-log" aria-label="Recent verdicts"></ol>
             </section>
         </div>
 
-        <section class="section wrap">
-            <div class="section-head">
-                <h2>What stays true</h2>
-                <span class="idx">01 / invariants</span>
-            </div>
-            <div class="facts">
-                <article class="fact">
-                    <p class="tag">Idle path</p>
-                    <h3>One load, then pass</h3>
-                    <p>If <code>cfg.armed == 0</code>, XDP does not parse Ethernet, does not LPM, and does not touch host or remote maps. Only <code>metrics.rx_*</code>, then <code>XDP_PASS</code>.</p>
-                </article>
-                <article class="fact">
-                    <p class="tag">Stay attached</p>
-                    <h3>Arming is a map write</h3>
-                    <p>XDP stays on the NIC in IDLE. <code>cfg.armed = 1</code> turns the gate on. Detach only on process exit — not every quiet cycle.</p>
-                </article>
-                <article class="fact">
-                    <p class="tag">Split brain</p>
-                    <h3>Userspace decides drops</h3>
-                    <p>Thresholds live in the control plane. The BPF program only looks prefixes up. Default verdict on a shared NIC is <code>XDP_PASS</code>.</p>
-                </article>
+        <section class="band">
+            <div class="wrap">
+                <div class="section-head">
+                    <h2>Why voidGate</h2>
+                    <span class="idx">01 / problem → approach</span>
+                </div>
+                <div class="why">
+                    <article>
+                        <p class="tag tag-drop">The problem</p>
+                        <h3>A flood lands on one VM</h3>
+                        <p>No scrubbing service upstream, no router to push flowspec to. The packets reach your NIC, and every one that climbs the network stack costs CPU the service needs.</p>
+                    </article>
+                    <article>
+                        <p class="tag tag-pass">The approach</p>
+                        <h3>Idle cheap, then cut in-kernel</h3>
+                        <p>XDP stays attached and only bumps a counter until the rate crosses <code>wake_pps</code> or <code>wake_mbps</code>. Then userspace counts sources and installs the worst of them into an LPM drop tree. Thresholds and decisions stay in userspace.</p>
+                    </article>
+                    <article>
+                        <p class="tag">What it won't do</p>
+                        <h3>Deliberately small</h3>
+                        <ul class="nogo">
+                            <li>No AF_XDP or redirect to userspace</li>
+                            <li>No NetFlow, sFlow, pcap, AF_PACKET</li>
+                            <li>No BGP</li>
+                            <li>No promiscuous mode in v1</li>
+                        </ul>
+                    </article>
+                </div>
             </div>
         </section>
 
         <section class="section wrap">
             <div class="section-head">
-                <h2>Four layers</h2>
+                <h2>Four layers, one program</h2>
                 <span class="idx">02 / shield</span>
             </div>
-            <p class="section-lede">One program, stacked. Watch first. Keep the VM reachable. Cut attacker hosts. Widen the prefix when the cluster is dense.</p>
-            <ol class="shield">
+            <p class="section-lede">Watch first. Keep the VM reachable. Cut attacker hosts. Widen the prefix when the cluster is dense.</p>
+            <ol class="pipeline">
                 <li class="watch">
-                    <span class="layer-idx">01</span>
-                    <div>
-                        <h3>Watch</h3>
-                        <p>IDLE. XDP stays attached. Only <code>rx_*</code>, then <code>XDP_PASS</code> — no parse, no LPM. Arm on <code>wake_pps</code> / <code>wake_mbps</code>, or with <code>voidgatectl arm</code>.</p>
-                    </div>
+                    <span class="layer-idx">01 · Watch</span>
+                    <h3>Count and pass</h3>
+                    <p>In idle, only <code>rx_*</code>, then <code>XDP_PASS</code>. No parse, no LPM. Arms on <code>wake_pps</code> / <code>wake_mbps</code> or <code>voidgatectl arm</code>.</p>
                 </li>
                 <li class="keep">
-                    <span class="layer-idx">02</span>
-                    <div>
-                        <h3>Keep</h3>
-                        <p>Never drop the VM. Allow CIDRs, TCP <code>allow_ports</code> on the local side, DHCP port pairs to this VM, IPv6 NDP 133–137 (hop limit 255), <code>fe80::/10</code>, <code>ff02::/16</code>.</p>
-                    </div>
+                    <span class="layer-idx">02 · Keep</span>
+                    <h3>Never drop the VM</h3>
+                    <p>Allow CIDRs, local-side TCP <code>allow_ports</code>, DHCP to this VM, IPv6 NDP with hop limit 255, <code>fe80::/10</code>, <code>ff02::/16</code>. All checked before the drop tree.</p>
                 </li>
                 <li class="cut">
-                    <span class="layer-idx">03</span>
-                    <div>
-                        <h3>Cut</h3>
-                        <p>Drop LPM. Policy inserts a remote over threshold as <code>/32</code> or <code>/128</code>. <code>voidgatectl drop</code> is the same layer, and does not auto-expire.</p>
-                    </div>
+                    <span class="layer-idx">03 · Cut</span>
+                    <h3>Drop the hosts</h3>
+                    <p>A remote over <code>threshold_pps</code> / <code>threshold_mbps</code> goes in as <code>/32</code> or <code>/128</code>. <code>voidgatectl drop</code> adds to this layer and never expires.</p>
                 </li>
                 <li class="widen">
-                    <span class="layer-idx">04</span>
-                    <div>
-                        <h3>Widen</h3>
-                        <p>When <code>aggregate_k</code> dropped hosts sit in one <code>/24</code> or <code>/64</code>, install that prefix. Policy and aggregate expire with <code>ban_time</code>.</p>
-                    </div>
+                    <span class="layer-idx">04 · Widen</span>
+                    <h3>Drop the cluster</h3>
+                    <p>Once <code>aggregate_k</code> dropped hosts share a <code>/24</code> or <code>/64</code>, install the whole prefix. Policy and aggregate drops expire after <code>ban_time</code>.</p>
                 </li>
             </ol>
-            <ul class="nogo">
-                <li>No AF_XDP</li>
-                <li>No packet redirect to userspace</li>
-                <li>No NetFlow, sFlow, pcap, or AF_PACKET</li>
-                <li>No BGP</li>
-                <li>No promiscuous mode in v1</li>
-            </ul>
         </section>
 
         <section class="section wrap">
             <div class="section-head">
-                <h2>State machine</h2>
-                <span class="idx">03 / idle ↔ active</span>
+                <h2>Idle ↔ Active</h2>
+                <span class="idx">03 / state machine</span>
             </div>
-            <div class="machine">
-                <article class="idle">
-                    <h3>Idle · armed = 0</h3>
-                    <p>XDP attached. Coarse rx counters only. Userspace polls <code>wake_pps</code> / <code>wake_mbps</code>.</p>
+            <div class="state-diagram">
+                <article class="state idle">
+                    <p class="state-name">Idle</p>
+                    <p class="state-flag"><code>cfg.armed = 0</code></p>
                     <ul>
-                        <li>No drop tree</li>
-                        <li>No per-source maps written</li>
-                        <li><code>voidgatectl arm</code> forces ACTIVE</li>
+                        <li>XDP attached, coarse rx counters only</li>
+                        <li>No drop tree, no per-source maps</li>
+                        <li>Userspace polls every <code>idle_poll_ms</code></li>
                     </ul>
                 </article>
-                <div class="arrows">
-                    <div>
-                        → ACTIVE
-                        <span>wake_pps / wake_mbps or ctl arm / drop</span>
+                <div class="transitions">
+                    <div class="transition to-active">
+                        <span class="t-label">arm</span>
+                        <svg viewBox="0 0 160 12" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="6" x2="150" y2="6"/><path d="M148 1 L158 6 L148 11 Z"/></svg>
+                        <span class="t-cond"><code>wake_pps</code> / <code>wake_mbps</code> exceeded, or <code>ctl arm</code> / <code>drop</code></span>
                     </div>
-                    <div>
-                        ← IDLE
-                        <span>quiet clear_seconds and empty drops</span>
+                    <div class="transition to-idle">
+                        <span class="t-label">disarm</span>
+                        <svg viewBox="0 0 160 12" preserveAspectRatio="none" aria-hidden="true"><line x1="10" y1="6" x2="160" y2="6"/><path d="M12 1 L2 6 L12 11 Z"/></svg>
+                        <span class="t-cond">quiet for <code>clear_seconds</code> and drop tree empty, or <code>ctl disarm</code></span>
                     </div>
                 </div>
-                <article class="active">
-                    <h3>Active · armed = 1</h3>
-                    <p>Parse IPv4/IPv6. Whitelist. Drop LPM. Count local hosts and remote sources.</p>
+                <article class="state active">
+                    <p class="state-name">Active</p>
+                    <p class="state-flag"><code>cfg.armed = 1</code></p>
                     <ul>
+                        <li>Parse IPv4/IPv6, whitelist, drop LPM</li>
                         <li>Top remotes → <code>/32</code> or <code>/128</code></li>
                         <li>Dense clusters → <code>/24</code> or <code>/64</code></li>
-                        <li><code>voidgatectl disarm</code> flushes drops</li>
                     </ul>
                 </article>
             </div>
-            <aside class="note idle">Disarm flushes <code>drop_*</code> only. Remote LRU maps are not wiped — BPF has no cheap hash flush. The next arm re-baselines userspace rate snapshots so leftover counters are not treated as a new flood.</aside>
+            <aside class="note idle">Disarm flushes <code>drop_*</code> only. Remote LRU maps are not wiped, since BPF has no cheap hash flush. The next arm re-baselines rate snapshots so leftover counters don't look like a new flood.</aside>
         </section>
 
         <section class="section wrap">
             <div class="section-head">
-                <h2>Control socket</h2>
+                <h2>Operate it</h2>
                 <span class="idx">04 / voidgatectl</span>
             </div>
-            <div class="term">
-                <div class="term-bar"><i></i><i></i><i></i> /run/voidgate.sock</div>
-                <pre><span class="cmd">$ sudo voidgatectl status</span>
-<span class="out">state=idle armed=0 rx_pps=412 rx_bps=2800000 drops=0 iface=eth0</span>
+            <div class="operate">
+                <div class="term">
+                    <div class="term-bar"><i></i><i></i><i></i> /run/voidgate.sock</div>
+                    <pre><span class="cmd">$ sudo voidgatectl status</span>
+<span class="out">state=idle armed=0 rx_pps=412 rx_bps=2800000 prefixes=0 iface=eth0</span>
 
 <span class="cmd">$ sudo voidgatectl drop 203.0.113.0/24</span>
 <span class="out">ok</span>
 
 <span class="cmd">$ sudo voidgatectl status</span>
-<span class="out">state=active armed=1 rx_pps=184200 rx_bps=980000000 drops=1 iface=eth0</span>
+<span class="out">state=active armed=1 rx_pps=184200 rx_bps=980000000 prefixes=1 iface=eth0</span>
 
 <span class="cmd">$ sudo voidgatectl disarm</span>
 <span class="out">ok</span></pre>
+                </div>
+                <div>
+                    <p class="section-lede">One line in, text out, over a Unix socket. There's also a Lua client and a localhost Prometheus endpoint.</p>
+                    <dl class="cmd-grid">
+                        <div><dt>status</dt><dd>state, rates, drop count</dd></div>
+                        <div><dt>stats</dt><dd>raw XDP counters</dd></div>
+                        <div><dt>drops</dt><dd>prefixes, reason, age</dd></div>
+                        <div><dt>arm / disarm</dt><dd>force a state</dd></div>
+                        <div><dt>drop &lt;cidr&gt;</dt><dd>manual, never expires</dd></div>
+                        <div><dt>undrop &lt;cidr&gt;</dt><dd>lift one prefix</dd></div>
+                        <div><dt>reload</dt><dd>re-read allow/local/ports</dd></div>
+                        <div><dt>:9105/metrics</dt><dd>Prometheus, 127.0.0.1</dd></div>
+                    </dl>
+                    <p><a class="more" href="operations.html">Commands and config reference →</a></p>
+                </div>
             </div>
-            <p class="lede">One line in, text out: <code>status</code>, <code>stats</code>, <code>drops</code>, <code>arm</code>, <code>disarm</code>, <code>drop &lt;cidr&gt;</code>, <code>undrop &lt;cidr&gt;</code>, <code>reload</code>. Prometheus, if enabled, is <code>127.0.0.1:9105/metrics</code>.</p>
+        </section>
+
+        <section class="band">
+            <div class="wrap">
+                <div class="section-head">
+                    <h2>Is it for you?</h2>
+                    <span class="idx">05 / fit &amp; faq</span>
+                </div>
+                <div class="fit">
+                    <article class="fit-yes">
+                        <h3>Good fit</h3>
+                        <ul>
+                            <li>A single Linux VM (5.8+, BTF) with a public NIC</li>
+                            <li>You want automatic in-kernel drops when a flood hits, and a near-free fast path the rest of the time</li>
+                            <li>A plain-text control socket and Prometheus are enough tooling</li>
+                        </ul>
+                    </article>
+                    <article class="fit-no">
+                        <h3>Look elsewhere</h3>
+                        <ul>
+                            <li>Scrubbing for a whole network edge, or BGP / flowspec</li>
+                            <li>Floods that saturate the uplink before packets reach the VM</li>
+                            <li>HTTP-layer filtering, packet capture, or flow export</li>
+                        </ul>
+                    </article>
+                </div>
+                <div class="faq">
+                    <details>
+                        <summary>Can it lock me out over SSH?</summary>
+                        <p>TCP ports in <code>allow_ports</code> (default <code>22</code>) are whitelisted on the local side, and whitelist checks run before the drop tree. Userspace also refuses to install a drop that covers <code>local_networks</code> or <code>allow_networks</code>. A remote <em>source</em> port of 22 is not a whitelist hit.</p>
+                    </details>
+                    <details>
+                        <summary>What does it cost when nothing is happening?</summary>
+                        <p>Per packet: bump the per-CPU <code>rx_pkts</code> / <code>rx_bytes</code> counters, read <code>cfg.armed</code>, return <code>XDP_PASS</code>. No Ethernet parse, no LPM lookup, no map writes. Userspace wakes once per <code>idle_poll_ms</code> to read the counters.</p>
+                    </details>
+                    <details>
+                        <summary>Does it break cloud metadata, DHCP, or IPv6 neighbor discovery?</summary>
+                        <p>No. The built-in allow list is <code>169.254.169.254/32</code>, <code>127.0.0.0/8</code>, <code>::1/128</code>, <code>fe80::/10</code>, <code>ff02::/16</code>. DHCP and DHCPv6 to this VM (exact port pairs) and ICMPv6 NDP types 133–137 with hop limit 255 also pass before the drop tree.</p>
+                    </details>
+                    <details>
+                        <summary>It dropped a host it shouldn't have. Now what?</summary>
+                        <p><code>voidgatectl undrop &lt;cidr&gt;</code> lifts one prefix, and <code>voidgatectl disarm</code> flushes them all. Policy and aggregate drops expire on their own after <code>ban_time</code>. For a permanent exemption, add the prefix to <code>allow_networks</code> and run <code>voidgatectl reload</code>. Reload also lifts any drop that now covers an allowed prefix.</p>
+                    </details>
+                    <details>
+                        <summary>Does it need a special NIC driver?</summary>
+                        <p>No. <code>xdp_mode = auto</code> tries native driver XDP, then falls back to generic SKB mode. You can pin either one. The test suite runs on a veth pair in private namespaces.</p>
+                    </details>
+                </div>
+            </div>
+        </section>
+
+        <section class="cta wrap">
+            <h2>Put it on the NIC and forget it's there.</h2>
+            <p>One daemon, one config file, one systemd unit.</p>
+            <div class="hero-actions">
+                <a class="btn btn-pass" href="install.html">Install voidGate</a>
+                <a class="btn btn-ghost" href="https://github.com/lynch1981/VoidGate">View source</a>
+            </div>
         </section>
     </main>
 
@@ -222,8 +433,9 @@
         <div class="wrap footer-inner">
             <div>
                 <strong>voidGate</strong>
-                <p>Multi-layer XDP shield for one Linux VM. Userspace Apache-2.0 · BPF GPL-2.0-only.</p>
+                <p>XDP DDoS shield for one Linux VM. Userspace Apache-2.0 · BPF GPL-2.0-only.</p>
                 <div class="footer-nav">
+                    <a href="index.html">Home</a>
                     <a href="architecture.html">Architecture</a>
                     <a href="install.html">Install</a>
                     <a href="operations.html">Operations</a>
