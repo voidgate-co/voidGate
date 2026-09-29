@@ -231,6 +231,11 @@ vg_ctrl_reload(struct vg_ctrl *c)
 
     *c->cfg = n;
 
+    /* Before the new local map goes live: a drop covering a new local
+     * address would otherwise match its inbound traffic by destination.
+     */
+    vg_ctrl_prune_protected(c);
+
     if (vg_cfg_commit(c->maps, c->state == VG_ACTIVE, c->cfg) < 0) {
         return -1;
     }

@@ -18,6 +18,7 @@ static int tick(struct vg_ctrl *c);
 #define FOREACH_MAX  64
 
 static struct vg_cidr deleted;
+static int deleted_count;
 static int complete_scan = 1;
 static int nitems;
 static struct {
@@ -31,6 +32,7 @@ vg_drop_del(struct vg_maps *m, const struct vg_cidr *p)
 {
     (void) m;
     deleted = *p;
+    deleted_count++;
     return 0;
 }
 
@@ -237,6 +239,35 @@ main(void)
 
     assert(tick(&c) == 0);
     assert(vg_ctrl_snap_count(&c) == 32);
+
+    /* A config change (reload) lifts drops that now cover local/allow,
+     * manual ones included, from the list and the map; others stay. */
+    {
+        struct vg_cidr keep, now_local, now_allow;
+
+        assert(vg_parse_cidr("198.18.0.0/24", &keep) == 0);
+        assert(vg_parse_cidr("203.0.113.0/24", &now_local) == 0);
+        assert(vg_parse_cidr("192.0.2.0/24", &now_allow) == 0);
+        c.drops[0] = (struct vg_drop_rec){ .cidr = keep,
+                                           .reason = VG_REASON_MANUAL };
+        c.drops[1] = (struct vg_drop_rec){ .cidr = now_local,
+                                           .reason = VG_REASON_AGGREGATE };
+        c.drops[2] = (struct vg_drop_rec){ .cidr = now_allow,
+                                           .reason = VG_REASON_MANUAL };
+        c.drop_count = 3;
+        deleted_count = 0;
+        assert(vg_ctrl_prune_protected(&c) == 0);
+        assert(c.drop_count == 3 && deleted_count == 0);
+
+        assert(vg_parse_cidr("203.0.113.5/32", &cfg.local_cidr[0]) == 0);
+        cfg.local_cidr_count = 1;
+        assert(vg_parse_cidr("192.0.2.99/32",
+                             &cfg.allow_cidr[cfg.allow_cidr_count++]) == 0);
+        assert(vg_ctrl_prune_protected(&c) == 2);
+        assert(deleted_count == 2);
+        assert(c.drop_count == 1);
+        assert(memcmp(&c.drops[0].cidr, &keep, sizeof(keep)) == 0);
+    }
 
     vg_ctrl_free(&c);
     puts("control-plane regression tests passed");

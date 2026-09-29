@@ -305,6 +305,33 @@ vg_ctrl_undrop(struct vg_ctrl *c, const struct vg_cidr *p)
 }
 
 
+/* After cfg changes (reload): lift every drop, manual ones included, that
+ * now covers local_* or allow_*. vg_ctrl_drop refuses such a prefix, and
+ * XDP matches drops on the destination too, so one left in place would
+ * blackhole a new local address. Returns the number lifted.
+ */
+int
+vg_ctrl_prune_protected(struct vg_ctrl *c)
+{
+    char buf[80];
+    int i = 0, n = 0;
+
+    while (i < c->drop_count) {
+        if (!vg_cidr_is_protected(c->cfg, &c->drops[i].cidr)) {
+            i++;
+            continue;
+        }
+
+        vg_cidr_to_str(&c->drops[i].cidr, buf, sizeof(buf));
+        vg_warn("reload: undrop %s (now covers local/allow)", buf);
+        vg_ctrl_undrop(c, &c->drops[i].cidr);
+        n++;
+    }
+
+    return n;
+}
+
+
 int
 vg_ctrl_arm(struct vg_ctrl *c, const char *why)
 {

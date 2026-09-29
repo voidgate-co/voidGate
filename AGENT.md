@@ -142,8 +142,9 @@ SKB mode to a veth pair and do not require a real NIC.
 - Unix ctl protocol is one line in, text out: `status`, `stats`,
   `drops`, `arm`, `disarm`, `drop <cidr>`, `undrop <cidr>`, `reload`.
 - `reload` re-reads the config file and replaces allow/local maps +
-  ports. It does not change the attached interface, XDP mode, or map
-  sizes.
+  ports. First it lifts every drop (manual included) that now covers
+  `local_*` or `allow_*`, so invariant 4 holds for existing drops too.
+  It does not change the attached interface, XDP mode, or map sizes.
 
 ## Out of scope until someone explicitly asks
 

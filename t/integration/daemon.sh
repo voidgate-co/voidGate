@@ -98,6 +98,22 @@ printf 'log_file = changed.log\n' >> run.conf
 grep -q 'reloaded run.conf' config.log
 stop_daemon
 
+# reload lifts drops that now cover a local or allow-listed prefix; others
+# stay.
+cp base.conf reload.conf
+start_daemon -c reload.conf
+[[ $("$root/voidgatectl" drop 203.0.113.0/24) == ok ]]
+[[ $("$root/voidgatectl" drop 192.0.2.0/24) == ok ]]
+[[ $("$root/voidgatectl" drop 198.18.0.0/24) == ok ]]
+printf 'local_networks = 198.51.100.10/32, 203.0.113.5/32\n' >> reload.conf
+printf 'allow_networks = 192.0.2.99/32\n' >> reload.conf
+[[ $("$root/voidgatectl" reload) == ok ]]
+drops=$("$root/voidgatectl" drops)
+[[ $drops =~ ^198\.18\.0\.0/24\ reason=1\ age=[0-9]+$ ]]
+grep -q 'reload: undrop 203.0.113.0/24' "$work/log/voidgate.log"
+grep -q 'reload: undrop 192.0.2.0/24' "$work/log/voidgate.log"
+stop_daemon
+
 # Append mode preserves existing contents.
 cp base.conf append.conf
 printf 'log_file = append.log\n' >> append.conf
