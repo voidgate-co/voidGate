@@ -9,7 +9,7 @@ ExecStart=/usr/local/sbin/voidgate -c /etc/voidgate/voidgate.conf
 Restart=on-failure
 RestartSec=2
 AmbientCapabilities=CAP_BPF CAP_NET_ADMIN CAP_PERFMON
-CapabilityBoundingSet=CAP_BPF CAP_NET_ADMIN CAP_PERFMON CAP_DAC_OVERRIDE
+CapabilityBoundingSet=CAP_BPF CAP_NET_ADMIN CAP_PERFMON CAP_DAC_OVERRIDE CAP_CHOWN
 LimitMEMLOCK=infinity
 
 [Install]

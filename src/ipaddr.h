@@ -15,6 +15,7 @@ struct vg_cidr {
 
 
 int vg_parse_cidr(const char *s, struct vg_cidr *out);
+int vg_parse_cidr_len(const char *s, size_t n, struct vg_cidr *out);
 void vg_cidr_mask(struct vg_cidr *p);
 int vg_cidr_contains(const struct vg_cidr *hay,
     const struct vg_cidr *needle);

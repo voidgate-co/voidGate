@@ -39,6 +39,28 @@ expect_cidr(const char *in, const char *want)
 }
 
 
+/* vg_parse_cidr_len: only the first n bytes of s count. */
+static void
+expect_cidr_len(const char *s, size_t n, const char *want)
+{
+    struct vg_cidr p;
+    char got[80];
+    int rc = vg_parse_cidr_len(s, n, &p);
+
+    if (rc == 0) {
+        vg_cidr_to_str(&p, got, sizeof(got));
+    }
+
+    if ((want == NULL && rc == 0)
+        || (want != NULL && (rc != 0 || strcmp(got, want) != 0)))
+    {
+        printf("FAIL parse %zu bytes of '%s': want %s, got %s\n", n, s,
+               want != NULL ? want : "reject", rc == 0 ? got : "reject");
+        g_fail++;
+    }
+}
+
+
 static int
 load_config(const char *line, struct vg_config *cfg)
 {
@@ -57,6 +79,7 @@ load_config(const char *line, struct vg_config *cfg)
     fclose(fp);
     rc = vg_config_load(path, cfg);
     unlink(path);
+
     return rc;
 }
 
@@ -159,6 +182,15 @@ main(void)
     memcpy(long_cidr, "10.0.0.0/8", 10);
     expect_cidr(long_cidr, NULL);
 
+    /* One word of a longer line, parsed in place (ctl "drop <cidr> ..."). */
+    expect_cidr_len("10.1.2.3/24 ttl=60", 11, "10.1.2.0/24");
+    expect_cidr_len("2001:db8::1/64 ttl=60", 14, "2001:db8::/64");
+    expect_cidr_len("10.0.0.1/24", 8, "10.0.0.1/32");
+    expect_cidr_len("10.0.0.1/24", 9, NULL);    /* "10.0.0.1/" */
+    expect_cidr_len("10.0.0.1 ttl=60", 0, NULL);
+    expect_cidr_len("10.0.0.1\0/8", 11, NULL);  /* NUL inside n: reject */
+    expect_cidr_len(long_cidr, sizeof(long_cidr) - 1, NULL);
+
     expect_config("allow_networks = 192.0.2.0/24, 2001:db8::/32", 0);
     expect_config("allow_networks = 10.0.0.0/", -1);
     expect_config("allow_networks = 10.0.0.0/abc", -1);
@@ -174,5 +206,6 @@ main(void)
     }
 
     puts("cidr unit tests passed");
+
     return 0;
 }

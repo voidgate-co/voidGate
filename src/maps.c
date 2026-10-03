@@ -191,6 +191,7 @@ vg_xdp_attach(struct vg_maps *m, const struct vg_config *cfg)
     m->attached = 1;
     vg_log("attached XDP on ifindex %d flags 0x%x (%s)", m->ifindex, flags,
            flags & XDP_FLAGS_DRV_MODE ? "native" : "skb");
+
     return 0;
 }
 
@@ -320,6 +321,7 @@ vg_cfg_commit(struct vg_maps *m, uint32_t armed,
     }
 
     fd = bpf_map__fd(m->skel->maps.cfg);
+
     return bpf_map_update_elem(fd, &key, &bc, BPF_ANY);
 }
 
@@ -471,6 +473,7 @@ vg_drop_flush(struct vg_maps *m)
 {
     flush_lpm(bpf_map__fd(m->skel->maps.drop_v4), 0);
     flush_lpm(bpf_map__fd(m->skel->maps.drop_v6), 1);
+
     return 0;
 }
 

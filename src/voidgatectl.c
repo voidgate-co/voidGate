@@ -15,12 +15,12 @@ main(int argc, char **argv)
 {
     struct sockaddr_un addr;
     char cmd[256], buf[8192];
-    int fd, i;
+    int fd, i, failed = 0, replied = 0;
     ssize_t n;
 
     if (argc < 2) {
         fprintf(stderr, "usage: voidgatectl status|stats|drops|arm|"
-                "disarm|drop <cidr>|undrop <cidr>|reload\n");
+                "disarm|drop <cidr> [ttl=<sec>]|undrop <cidr>|reload\n");
         return 1;
     }
 
@@ -63,8 +63,16 @@ main(int argc, char **argv)
     shutdown(fd, SHUT_WR);
     while ((n = read(fd, buf, sizeof(buf) - 1)) > 0) {
         buf[n] = 0;
+
+        /* Scripts need a refused command to fail. */
+        if (!replied && strncmp(buf, "error", 5) == 0) {
+            failed = 1;
+        }
+
+        replied = 1;
         fputs(buf, stdout);
     }
     close(fd);
-    return 0;
+
+    return failed || !replied;
 }

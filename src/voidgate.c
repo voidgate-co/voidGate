@@ -382,7 +382,7 @@ main(int argc, char **argv)
         vg_die("control plane init failed");
     }
 
-    ctl_fd = vg_ctl_server_listen(VG_SOCK_PATH);
+    ctl_fd = vg_ctl_server_listen(VG_SOCK_PATH, cfg.ctl_socket_group);
 
     if (ctl_fd < 0) {
         vg_warn("ctl socket %s failed: %s (voidgatectl disabled)",
@@ -513,5 +513,6 @@ main(int argc, char **argv)
     close(pid_fd);
 
     vg_log("exit");
+
     return result;
 }

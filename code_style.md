@@ -287,6 +287,32 @@ continuation line so it ends at position 79:
                                 sizeof(struct host_counters) * (size_t) ncpus);
 ```
 
+Put an empty line before the last `return` of a function, unless it is
+the only statement in the body. Early `return`s inside an `if` / `else`
+or loop body do not need one:
+
+```c
+static int
+vg_snap_open(vg_snap_pool_t *pool, unsigned cap)
+{
+    pool->snap_free = calloc(cap, sizeof(vg_snap_ent_t));
+    if (pool->snap_free == NULL) {
+        return -1;
+    }
+
+    pool->snap_cap = cap;
+
+    return 0;
+}
+
+
+static unsigned
+vg_snap_cap(vg_snap_pool_t *pool)
+{
+    return pool->snap_cap;
+}
+```
+
 Prefer `static inline` in headers. Do not use a bare `inline` without
 `static` in a header.
 
@@ -506,6 +532,7 @@ level:
 failed:
 
     vg_maps_close(m);
+
     return -1;
 ```
 
@@ -520,6 +547,8 @@ These override nginx where they conflict.
 - Blank line before and after an `if` / `else` chain or `for` when it
   sits next to another statement (not against the enclosing `{` / `}`).
 - Blank line before `} else {` and, usually, before `} else if`.
+- Blank line before the last `return` of a function, unless it is the
+  only statement in the body.
 - SPDX instead of nginx `Copyright (C)` banners. Userspace is
   Apache-2.0. `src/bpf/voidgate.bpf.c` is GPL-2.0-only and may keep
   `// SPDX-License-Identifier: GPL-2.0-only` on line 1. No other `//`

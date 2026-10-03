@@ -23,6 +23,7 @@
 #define VG_REASON_MANUAL  1
 #define VG_REASON_POLICY  2
 #define VG_REASON_AGGREGATE  3
+#define VG_REASON_TIMED  4
 
 #define VG_IPPROTO_TCP  6
 #define VG_IPPROTO_UDP  17

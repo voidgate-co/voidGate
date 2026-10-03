@@ -3,8 +3,8 @@ CC      ?= gcc
 CLANG   ?= clang
 LLVM_STRIP ?= llvm-strip
 BPFTOOL ?= bpftool
-LUA_VERSION ?= 5.4
-LUA_DIR ?= $(PREFIX)/share/lua/$(LUA_VERSION)
+# OpenResty's site lualib; Kong / APISIX: point at their Lua path.
+LUA_DIR ?= /usr/local/openresty/site/lualib
 
 PREFIX  ?= /usr/local
 ARCH    := $(shell uname -m | sed 's/x86_64/x86/' | sed 's/aarch64/arm64/')
@@ -85,5 +85,5 @@ install: all
 		$(DESTDIR)/lib/systemd/system/voidgate.service
 
 install-lua:
-	install -d $(DESTDIR)$(LUA_DIR)
-	install -m 0644 lua/voidgate.lua $(DESTDIR)$(LUA_DIR)/voidgate.lua
+	install -d $(DESTDIR)$(LUA_DIR)/resty
+	install -m 0644 lua/resty/voidgate.lua $(DESTDIR)$(LUA_DIR)/resty/voidgate.lua

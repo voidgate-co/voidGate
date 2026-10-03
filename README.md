@@ -84,41 +84,102 @@ Edit `interface` in the config to the VM's public NIC. Do not point this
 at a shared management-only interface you cannot afford to XDP-attach;
 the idle path is `XDP_PASS`, but attach still requires driver/SKB XDP.
 
-## Lua integration
+## OpenResty integration
 
-The `lua/voidgate.lua` module talks directly to the daemon's Unix socket.
-It supports Lua 5.1–5.4 and LuaJIT with LuaSocket's `socket.unix` module.
-On Ubuntu, install the optional Lua dependencies and module with:
+voidGate is not a WAF. Let OpenResty, or a gateway built on it such as Kong
+or APISIX, decide which client is abusive (`limit_req`, failed logins, bot
+rules) and push that address down to XDP with a timed drop. The design and
+its trade-offs are in [`doc/l7-bridge.md`](doc/l7-bridge.md).
+
+`lua/resty/voidgate.lua` is a non-blocking client. It talks to the daemon's
+Unix socket with an `ngx.socket.tcp` cosocket and needs no other library.
+Install it into OpenResty's lualib, or point `LUA_DIR` at your gateway's
+Lua path (Kong: `lua_package_path` in `kong.conf`; APISIX:
+`apisix.extra_lua_path` in `config.yaml`):
 
 ```sh
-sudo apt install lua5.4 lua-socket
-sudo make install-lua LUA_VERSION=5.4
+sudo make install-lua                     # /usr/local/openresty/site/lualib
+sudo make install-lua LUA_DIR=/opt/lualib
 ```
 
-Set `LUA_VERSION=5.1` for Lua 5.1/LuaJIT, or override `LUA_DIR` for an
-embedded application's module directory. To use the source checkout without
-installing, set `LUA_PATH='./lua/?.lua;;'`.
+nginx workers do not run as root. Set `ctl_socket_group` in the daemon
+config to the workers' group and restart voidgate. The daemon then creates
+`/run/voidgate.sock` as `0660 root:<group>`.
+
+| Gateway | Common worker group | Set by |
+| --- | --- | --- |
+| OpenResty | `nogroup` (Debian/Ubuntu), `nobody` (RHEL) | `user` in `nginx.conf` |
+| Kong | `kong` | `nginx_user` in `kong.conf` |
+| APISIX | `nogroup` or `nobody`; `apisix` in the official Docker image | `nginx_config.user` in `config.yaml` |
+
+```
+ctl_socket_group = kong
+```
+
+Check the real group with `ps -eo user,group,args | grep 'worker process'`.
+If the gateway runs in a container with the socket bind-mounted, the
+container's worker must have the same numeric gid as the group on the host.
+Members of that group get the whole protocol, `disarm` and `reload`
+included. An unknown group only logs a warning and leaves the socket
+root-only.
+
+### Banning from a request
+
+```nginx
+lua_shared_dict voidgate_ban 1m;
+
+location / {
+    limit_req zone=api burst=20 nodelay;
+    limit_req_status 429;
+    log_by_lua_block {
+        if ngx.status == 429 then
+            require("resty.voidgate").ban(ngx.var.remote_addr, 600,
+                                          { dict = "voidgate_ban" })
+        end
+    }
+}
+```
+
+`ban(ip, ttl, opt)` works from any phase, log included: it queues the
+request in an `ngx.timer.at` timer and returns `true`. The daemon's answer
+goes to the nginx error log. With `opt.dict`, an address is sent at most
+once per `opt.window` seconds (default 10), so the burst before XDP takes
+over does not queue one timer per request. `opt.client` takes a client from
+`new()`. A Kong or APISIX plugin calls the same function from its `log`
+handler.
+
+The ban is `drop <ip> ttl=<ttl>` on the socket (`reason=4`). It lifts itself
+after `ttl` seconds (1 to one year). Banning the same prefix again only
+extends it, a manual `drop` of it makes it permanent, and timed drops never
+count toward `aggregate_k`, so a few bans behind one NAT do not become a
+`/24` drop. Like every drop, a ban arms the gate until it lifts, and
+`disarm` or a daemon restart forgets it.
+
+Ban only real peers. Behind a CDN or load balancer, take the client address
+from the proxy header only for trusted proxies (`set_real_ip_from`), and put
+the proxy ranges in `allow_networks`. Otherwise a forged header bans your
+own front door. The daemon refuses drops that cover `allow_networks` or
+`local_networks`.
+
+### Methods
 
 ```lua
-local vg = require("voidgate")
+local vg = require("resty.voidgate")
 
-local status, err = vg.status()
-if not status then
-    error(err)
-end
-print(status.state, status.armed, status.rx_pps)
+local status = assert(vg.status())
+ngx.say(status.state, " ", status.rx_pps)
 
-local ok, err = vg.drop("203.0.113.0/24")
-if not ok then
-    error(err)
-end
+assert(vg.drop("203.0.113.0/24"))
 assert(vg.undrop("203.0.113.0/24"))
 
--- Optional settings; each method opens and closes its own connection.
-local client = assert(vg.new({ path = "/run/voidgate.sock", timeout = 1 }))
+-- Optional settings; each call opens and closes its own connection.
+local client = vg.new({ path = "/run/voidgate.sock", timeout = 1 })
 local stats = assert(client:stats())
-print(stats.rx_pkts) -- Decimal string: preserves all 64 bits.
+ngx.say(stats.rx_pkts) -- Decimal string: preserves all 64 bits.
 ```
+
+Cosockets yield, so call methods from `rewrite`, `access`, `content` or a
+timer. Use `ban()` from any other phase.
 
 | Method | Successful return |
 | --- | --- |
@@ -126,36 +187,34 @@ print(stats.rx_pkts) -- Decimal string: preserves all 64 bits.
 | `stats()` | Table: counters as decimal strings; numeric rates and prefix count; string `state` |
 | `drops()` | Array of `{ cidr, reason, age }` entries; empty array when there are no drops |
 | `arm()`, `disarm()`, `reload()` | `true` |
-| `drop(cidr)`, `undrop(cidr)` | `true` |
+| `drop(cidr [, ttl])`, `undrop(cidr)` | `true`; with `ttl` (seconds, 1–31536000) the daemon lifts the drop itself |
+| `ban(ip, ttl [, opt])` | `true` once queued; see above |
 
 Operations return `nil, error` on connection, timeout, or daemon errors.
 CIDR validity is checked by the daemon; the client only rejects a CIDR
-that contains whitespace. `stats()` keeps `rx_pkts`,
-`rx_bytes`, `passed`, `dropped`, `non_ip`, `map_full`, and `parse_err` as
-strings to avoid precision loss. Drop `reason` and `age` (seconds) are
-numbers.
-
-The calling process needs permission to access `/run/voidgate.sock` (mode
-`0660`). Calls block, with a default one-second timeout per socket operation;
-this client is intended for standard Lua hosts, not an OpenResty request loop.
-The daemon currently has an 8192-byte response buffer, so large `drops()` lists
-may be truncated by the daemon.
+that contains whitespace. `stats()` keeps `rx_pkts`, `rx_bytes`, `passed`,
+`dropped`, `non_ip`, `map_full`, and `parse_err` as strings to avoid
+precision loss. Drop `reason` and `age` (seconds) are numbers. The
+default timeout is one second per socket operation. The daemon has an
+8192-byte response buffer, so large `drops()` lists may be truncated.
 
 The protocol is one newline-terminated command per connection, followed by a
 text response and connection close. Commands are limited to 254 bytes before
 the newline. The server also accepts a command terminated by a write-side EOF.
+`voidgatectl` exits 1 when the daemon answers `error: ...`.
 
-Run the Lua control tests against an isolated real daemon (requires sudo,
-BPF support, Bash, coreutils, iproute2, util-linux, Lua, and LuaSocket):
+Run the client tests against an isolated real daemon (requires sudo, BPF
+support, curl, and OpenResty or nginx with `lua-nginx-module`; on Ubuntu,
+`nginx-core` and `libnginx-mod-http-lua`):
 
 ```sh
-sudo t/integration/lua.sh
+sudo t/integration/resty.sh
 ```
 
-The Bash runner creates private network, mount and PID namespaces, a temporary
-veth pair, and a private `/run/voidgate.sock`. It stops the daemon and removes
-temporary files after the test. Build `voidgate` and `voidgatectl` first.
-The runner uses `lua` from `PATH`.
+It runs nginx in private namespaces with workers as `nobody:nogroup`, the
+method tests in `t/integration/resty.lua`, and `ban()` from the log phase.
+It skips when neither `openresty` nor `nginx` is in `PATH`; set `NGINX` to
+choose the binary.
 
 ## How it decides
 
@@ -177,7 +236,7 @@ src/bpf/voidgate.bpf.c   XDP program
 src/bpf/voidgate.h       shared map/packet structs
 src/voidgate.c           daemon
 src/voidgatectl.c        voidgatectl
-lua/voidgate.lua         Lua control client
+lua/resty/voidgate.lua   OpenResty control client
 src/policy.c             IDLE/ACTIVE policy
 src/maps.c               libbpf attach + LPM helpers
 ```

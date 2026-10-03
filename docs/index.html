@@ -354,13 +354,14 @@ sudo ./voidgatectl status</code></pre>
 <span class="out">ok</span></pre>
                 </div>
                 <div>
-                    <p class="section-lede">One line in, text out, over a Unix socket. There's also a Lua client and a localhost Prometheus endpoint.</p>
+                    <p class="section-lede">One line in, text out, over a Unix socket. There's also an OpenResty client and a localhost Prometheus endpoint.</p>
                     <dl class="cmd-grid">
                         <div><dt>status</dt><dd>state, rates, drop count</dd></div>
                         <div><dt>stats</dt><dd>raw XDP counters</dd></div>
                         <div><dt>drops</dt><dd>prefixes, reason, age</dd></div>
                         <div><dt>arm / disarm</dt><dd>force a state</dd></div>
                         <div><dt>drop &lt;cidr&gt;</dt><dd>manual, never expires</dd></div>
+                        <div><dt>drop &lt;cidr&gt; ttl=&lt;s&gt;</dt><dd>timed, for OpenResty bans</dd></div>
                         <div><dt>undrop &lt;cidr&gt;</dt><dd>lift one prefix</dd></div>
                         <div><dt>reload</dt><dd>re-read allow/local/ports</dd></div>
                         <div><dt>:9105/metrics</dt><dd>Prometheus, 127.0.0.1</dd></div>

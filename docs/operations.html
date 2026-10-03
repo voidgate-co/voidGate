@@ -78,6 +78,10 @@
                                 <td>manual insert; forces ACTIVE. Reason 1. Not auto-expired.</td>
                             </tr>
                             <tr>
+                                <td>drop &lt;cidr&gt; ttl=&lt;sec&gt;</td>
+                                <td>timed insert for OpenResty bans; forces ACTIVE. Reason 4. Lifted after <code>ttl</code> (1 s to one year); a re-ban only extends it. Never upgrades a manual drop and never counts toward <code>aggregate_k</code>.</td>
+                            </tr>
+                            <tr>
                                 <td>undrop &lt;cidr&gt;</td>
                                 <td>remove one prefix from the drop tree</td>
                             </tr>
@@ -255,22 +259,28 @@ voidgate_drop_prefixes 0
 voidgate_rx_pps 0</code></pre>
                 </div>
 
-                <h2>Lua client</h2>
-                <p><code>lua/voidgate.lua</code> talks to the same socket from Lua 5.1–5.4 or LuaJIT, using LuaSocket's <code>socket.unix</code>. Install it with <code>sudo make install-lua LUA_VERSION=5.4</code>.</p>
+                <h2>OpenResty client</h2>
+                <p>voidGate is not a WAF. Let OpenResty, or a gateway built on it such as Kong or APISIX, decide who is abusive and push that address down to XDP with a timed drop. <code>lua/resty/voidgate.lua</code> talks to the socket over a non-blocking cosocket. Install it with <code>sudo make install-lua</code> (OpenResty's site lualib, or set <code>LUA_DIR</code>), and set <code>ctl_socket_group</code> to the worker group so nginx can reach the socket: commonly <code>nogroup</code> or <code>nobody</code> for OpenResty, <code>kong</code> for Kong, and <code>nogroup</code>, <code>nobody</code> or <code>apisix</code> (Docker image) for APISIX.</p>
                 <div class="code">
                     <div class="code-head">
-                        <span>lua</span>
+                        <span>nginx</span>
                         <button type="button" class="copy">Copy</button>
                     </div>
-                    <pre><code>local vg = require("voidgate")
+                    <pre><code>lua_shared_dict voidgate_ban 1m;
 
-local status = assert(vg.status())
-print(status.state, status.armed, status.rx_pps)
-
-assert(vg.drop("203.0.113.0/24"))
-assert(vg.undrop("203.0.113.0/24"))</code></pre>
+location / {
+    limit_req zone=api burst=20 nodelay;
+    limit_req_status 429;
+    log_by_lua_block {
+        if ngx.status == 429 then
+            require("resty.voidgate").ban(ngx.var.remote_addr, 600,
+                                          { dict = "voidgate_ban" })
+        end
+    }
+}</code></pre>
                 </div>
-                <p>Every method returns <code>nil, err</code> on a connection, timeout or daemon error. <code>stats()</code> returns 64-bit counters as decimal strings. Calls block with a one-second default timeout, so the client suits standard Lua hosts, not an OpenResty request loop.</p>
+                <p><code>ban(ip, ttl, opt)</code> works from any phase, log included, and sends one ban per address per window. The other methods (<code>status()</code>, <code>stats()</code>, <code>drops()</code>, <code>drop(cidr [, ttl])</code>, <code>undrop()</code>, <code>arm()</code>, <code>disarm()</code>, <code>reload()</code>) run in rewrite, access, content or timer context and return <code>nil, err</code> on failure. <code>stats()</code> returns 64-bit counters as decimal strings.</p>
+                <aside class="note warn">Ban only real peers. Behind a CDN or load balancer, put the proxy ranges in <code>allow_networks</code>, or a forged client-IP header can ban your own front door. Any drop keeps the gate armed until it lifts.</aside>
 
                 <h2>ACTIVE policy, short</h2>
                 <p>Each tick, remotes over threshold become <code>/32</code> or <code>/128</code>. Dense clusters become <code>/24</code> or <code>/64</code>. Userspace will not install a prefix that covers the VM itself or the allow list. On disarm, <code>remote_*</code> stays; the next arm re-baselines snapshots so leftover counters are not a phantom flood.</p>

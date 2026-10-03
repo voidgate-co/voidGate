@@ -18,8 +18,22 @@ static int bits_equal(const uint8_t *a, const uint8_t *b, int bits);
 int
 vg_parse_cidr(const char *s, struct vg_cidr *out)
 {
+    if (s == NULL) {
+        return -1;
+    }
+
+    return vg_parse_cidr_len(s, strlen(s), out);
+}
+
+
+/* The first n bytes of s, which need not be NUL-terminated: lets a caller
+ * parse one word of a longer line in place. A NUL inside those n bytes is
+ * rejected, not read as the end of the cidr.
+ */
+int
+vg_parse_cidr_len(const char *s, size_t n, struct vg_cidr *out)
+{
     int     plen, max;
-    size_t  len;
     char   *slash, *p;
     char    tmp[128];
 
@@ -28,13 +42,13 @@ vg_parse_cidr(const char *s, struct vg_cidr *out)
     }
 
     memset(out, 0, sizeof(*out));
-    len = strlen(s);
 
-    if (len >= sizeof(tmp)) {
+    if (n >= sizeof(tmp) || memchr(s, '\0', n) != NULL) {
         return -1;
     }
 
-    memcpy(tmp, s, len + 1);
+    memcpy(tmp, s, n);
+    tmp[n] = '\0';
     slash = strchr(tmp, '/');
     plen = -1;
 
@@ -64,6 +78,7 @@ vg_parse_cidr(const char *s, struct vg_cidr *out)
 
     out->prefixlen = (uint8_t) (plen < 0 ? max : plen);
     vg_cidr_mask(out);
+
     return 0;
 }
 
@@ -167,6 +182,7 @@ vg_cidr_v4_slash24(const struct vg_cidr *host, struct vg_cidr *net)
     *net = *host;
     net->prefixlen = 24;
     vg_cidr_mask(net);
+
     return 0;
 }
 
@@ -181,6 +197,7 @@ vg_cidr_v6_slash64(const struct vg_cidr *host, struct vg_cidr *net)
     *net = *host;
     net->prefixlen = 64;
     vg_cidr_mask(net);
+
     return 0;
 }
 

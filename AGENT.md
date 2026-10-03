@@ -27,13 +27,17 @@ src/policy.c             IDLE/ACTIVE policy
 src/maps.c               libbpf load/attach, LPM helpers
 src/config.c             key=value config
 src/ipaddr.c             CIDR parse / overlap
+src/list.h               intrusive list / hlist (own code: the kernel's
+                         list.h is GPL, userspace is Apache-2.0)
 configs/voidgate.conf
 t/*.t                    XDP verdict / CIDR blocks (Test::Base); see t/README.md
 t/lib/VG/*.pm            suite glue: frame builder, ctl client
 t/bin/run                real daemon + prove t/ (needs root)
 t/unit/policy.c          control-plane unit test
 t/unit/cidr.c            CIDR parser + config CIDR lists unit test
-t/integration/*.sh       daemon / Lua / veth flood (needs root)
+t/integration/*.sh       daemon / OpenResty / veth flood (needs root)
+lua/resty/voidgate.lua   OpenResty client (cosocket) + ban(); the only
+                         Lua client (Kong / APISIX run on OpenResty)
 ```
 
 Generated, do not edit or commit: `src/bpf/voidgate.skel.h`, `*.o`,
@@ -83,6 +87,10 @@ ACTIVE -- quiet for clear_seconds AND drop tree empty --> IDLE
 - `threshold_*`: this remote is part of the attack, install a drop.
 - Policy (ACTIVE, 1s): top remotes over threshold → `/32` or `/128`;
   dense clusters → `/24` or `/64`. Manual drops are not auto-expired.
+- Timed drops (`drop <cidr> ttl=<sec>`, reason 4) are L7 bans pushed by
+  OpenResty. They lift at their own expiry, a re-ban only
+  extends them, manual wins over them, and they never count toward
+  `aggregate_k` (one NAT /24 of web users must not become a prefix drop).
 
 ## Maps
 
@@ -106,7 +114,7 @@ make
 make test                         # t/unit/* + sudo t/bin/run
 sudo t/integration/netns.sh
 sudo t/integration/daemon.sh
-sudo t/integration/lua.sh
+sudo t/integration/resty.sh       # needs nginx + lua module; else skips
 ```
 
 Needs clang, llvm, libbpf, bpftool, libelf, libtest-base-perl, root
@@ -140,7 +148,11 @@ SKB mode to a veth pair and do not require a real NIC.
   (packet specs: `t/lib/VG/Packet.pm`); if you change wake/arm, run
   `t/integration/netns.sh`.
 - Unix ctl protocol is one line in, text out: `status`, `stats`,
-  `drops`, `arm`, `disarm`, `drop <cidr>`, `undrop <cidr>`, `reload`.
+  `drops`, `arm`, `disarm`, `drop <cidr> [ttl=<sec>]`, `undrop <cidr>`,
+  `reload`.
+  Replies starting with `error` make `voidgatectl` exit 1. Keep the
+  `drops` line format (`<cidr> reason=N age=N`): the Lua client and
+  tests anchor on it.
 - `reload` re-reads the config file and replaces allow/local maps +
   ports. First it lifts every drop (manual included) that now covers
   `local_*` or `allow_*`, so invariant 4 holds for existing drops too.

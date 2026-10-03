@@ -8,6 +8,7 @@
 #include "policy.h"
 
 #include <errno.h>
+#include <grp.h>
 #include <stdio.h>
 #include <string.h>
 #include <sys/socket.h>
@@ -15,6 +16,9 @@
 #include <sys/un.h>
 #include <time.h>
 #include <unistd.h>
+
+
+#define VG_MAX_DROP_TTL  31536000     /* one year */
 
 
 typedef void (*vg_ctl_handler_pt)(struct vg_ctrl *ctrl, const char *args,
@@ -42,6 +46,7 @@ static void ctl_drop(struct vg_ctrl *ctrl, const char *args,
     char *reply, size_t reply_size);
 static void ctl_undrop(struct vg_ctrl *ctrl, const char *args,
     char *reply, size_t reply_size);
+static int parse_ttl(const char *s, uint32_t *out);
 static int vg_ctrl_reload(struct vg_ctrl *c);
 static void ctl_reload(struct vg_ctrl *ctrl, const char *args,
     char *reply, size_t reply_size);
@@ -103,8 +108,9 @@ static void
 ctl_drops(struct vg_ctrl *ctrl, const char *args, char *reply,
     size_t reply_size)
 {
-    int     i;
-    size_t  used = 0;
+    size_t                     used = 0;
+    struct vg_list            *l;
+    const struct vg_drop_rec  *r;
 
     if (ctrl->drop_count == 0) {
         snprintf(reply, reply_size, "(none)\n");
@@ -113,14 +119,19 @@ ctl_drops(struct vg_ctrl *ctrl, const char *args, char *reply,
 
     reply[0] = 0;
 
-    for (i = 0; i < ctrl->drop_count && used + 80 < reply_size; i++) {
+    /* Oldest first. */
+    for (l = ctrl->drop_all.next;
+         l != &ctrl->drop_all && used + 80 < reply_size;
+         l = l->next)
+    {
         int   n;
         char  p[80];
 
-        vg_cidr_to_str(&ctrl->drops[i].cidr, p, sizeof(p));
+        r = vg_list_entry(l, struct vg_drop_rec, all);
+        vg_cidr_to_str(&r->cidr, p, sizeof(p));
         n = snprintf(reply + used, reply_size - used,
-                     "%s reason=%u age=%ld\n", p, ctrl->drops[i].reason,
-                     (long) (time(NULL) - ctrl->drops[i].inserted));
+                     "%s reason=%u age=%ld\n", p, r->reason,
+                     (long) (time(NULL) - r->inserted));
 
         if (n > 0) {
             used += (size_t) n;
@@ -155,16 +166,39 @@ ctl_disarm(struct vg_ctrl *ctrl, const char *args, char *reply,
 }
 
 
+/* args is the line after "drop " (the dispatcher strips it):
+ *   "<cidr>"                manual drop, stays until undrop or disarm
+ *   "<cidr> ttl=<seconds>"  timed drop (reason 4), lifts itself
+ * The first word is always the cidr; only text after the first space in
+ * args is parsed as options, so a cidr is never read as a ttl.
+ */
 static void
 ctl_drop(struct vg_ctrl *ctrl, const char *args, char *reply,
     size_t reply_size)
 {
-    struct vg_cidr  p;
+    int              rc;
+    size_t           len;
+    uint32_t         ttl = 0;
+    const char      *sp;
+    struct vg_cidr   p;
 
-    if (vg_parse_cidr(args, &p) < 0) {
+    sp = strchr(args, ' ');
+    len = sp != NULL ? (size_t) (sp - args) : strlen(args);
+
+    if (vg_parse_cidr_len(args, len, &p) < 0) {
         snprintf(reply, reply_size, "error: bad cidr\n");
+        return;
+    }
 
-    } else if (vg_ctrl_drop(ctrl, &p, VG_REASON_MANUAL) < 0) {
+    if (sp != NULL && parse_ttl(sp + 1, &ttl) < 0) {
+        snprintf(reply, reply_size, "error: bad ttl\n");
+        return;
+    }
+
+    rc = ttl ? vg_ctrl_drop_ttl(ctrl, &p, ttl)
+             : vg_ctrl_drop(ctrl, &p, VG_REASON_MANUAL);
+
+    if (rc < 0) {
         snprintf(reply, reply_size, "error: refused or map update failed\n");
 
     } else {
@@ -182,10 +216,44 @@ ctl_undrop(struct vg_ctrl *ctrl, const char *args, char *reply,
     if (vg_parse_cidr(args, &p) < 0) {
         snprintf(reply, reply_size, "error: bad cidr\n");
 
+    } else if (vg_ctrl_undrop(ctrl, &p) < 0) {
+        snprintf(reply, reply_size, "error: map update failed\n");
+
     } else {
-        vg_ctrl_undrop(ctrl, &p);
         snprintf(reply, reply_size, "ok\n");
     }
+}
+
+
+/* "ttl=<seconds>": only decimal digits after "ttl=" (no sign, space or
+ * trailing text), 1 .. VG_MAX_DROP_TTL. The bound is checked per digit,
+ * so the value cannot overflow.
+ */
+static int
+parse_ttl(const char *s, uint32_t *out)
+{
+    uint32_t  v;
+
+    if (strncmp(s, "ttl=", 4) != 0) {
+        return -1;
+    }
+
+    for (v = 0, s += 4; *s != '\0'; s++) {
+        if (*s < '0' || *s > '9' || v > VG_MAX_DROP_TTL) {
+            return -1;
+        }
+
+        v = v * 10 + (uint32_t) (*s - '0');
+    }
+
+    /* Also rejects an empty "ttl=". */
+    if (v < 1 || v > VG_MAX_DROP_TTL) {
+        return -1;
+    }
+
+    *out = v;
+
+    return 0;
 }
 
 
@@ -198,6 +266,7 @@ vg_ctrl_reload(struct vg_ctrl *c)
     char                   mode[16];
     char                   log_file[VG_CFG_PATH_MAX];
     char                   pid_file[VG_CFG_PATH_MAX];
+    char                   group[sizeof(c->cfg->ctl_socket_group)];
 
     if (c->cfg_path[0] == '\0') {
         return -1;
@@ -207,6 +276,7 @@ vg_ctrl_reload(struct vg_ctrl *c)
     snprintf(mode, sizeof(mode), "%s", c->cfg->xdp_mode);
     snprintf(log_file, sizeof(log_file), "%s", c->cfg->log_file);
     snprintf(pid_file, sizeof(pid_file), "%s", c->cfg->pid_file);
+    snprintf(group, sizeof(group), "%s", c->cfg->ctl_socket_group);
     rsz = c->cfg->remote_map_size;
     dsz = c->cfg->drop_map_size;
 
@@ -218,6 +288,7 @@ vg_ctrl_reload(struct vg_ctrl *c)
     snprintf(n.xdp_mode, sizeof(n.xdp_mode), "%s", mode);
     snprintf(n.log_file, sizeof(n.log_file), "%s", log_file);
     snprintf(n.pid_file, sizeof(n.pid_file), "%s", pid_file);
+    snprintf(n.ctl_socket_group, sizeof(n.ctl_socket_group), "%s", group);
     n.remote_map_size = rsz;
     n.drop_map_size = dsz;
 
@@ -247,6 +318,7 @@ vg_ctrl_reload(struct vg_ctrl *c)
     }
 
     vg_log("reloaded %s", c->cfg_path);
+
     return 0;
 }
 
@@ -283,13 +355,18 @@ vg_ctl_server_alive(const char *path)
     /* A leftover socket file from a crash refuses; a daemon accepts. */
     alive = connect(fd, (struct sockaddr *) &addr, sizeof(addr)) == 0;
     close(fd);
+
     return alive;
 }
 
 
+/* group: "" leaves the socket root-only; otherwise members of that group
+ * (an nginx/OpenResty worker user) get the full control protocol.
+ */
 int
-vg_ctl_server_listen(const char *path)
+vg_ctl_server_listen(const char *path, const char *group)
 {
+    struct group *gr;
     struct sockaddr_un addr;
     int fd;
 
@@ -310,6 +387,18 @@ vg_ctl_server_listen(const char *path)
     }
 
     chmod(path, 0660);
+
+    if (group[0] != '\0') {
+        gr = getgrnam(group);
+
+        if (gr == NULL) {
+            vg_warn("ctl_socket_group %s: no such group", group);
+
+        } else if (chown(path, (uid_t) -1, gr->gr_gid) < 0) {
+            vg_warn("ctl_socket_group %s: chown %s: %s", group, path,
+                    strerror(errno));
+        }
+    }
 
     if (listen(fd, 16) < 0) {
         close(fd);

@@ -49,6 +49,8 @@ static const struct cfg_scalar scalars[] = {
       sizeof(((struct vg_config *) NULL)->log_file) },
     { "pid_file", CFG_STR, CFG_OFF(pid_file),
       sizeof(((struct vg_config *) NULL)->pid_file) },
+    { "ctl_socket_group", CFG_STR, CFG_OFF(ctl_socket_group),
+      sizeof(((struct vg_config *) NULL)->ctl_socket_group) },
     { "wake_pps", CFG_U64, CFG_OFF(wake_pps), 0 },
     { "wake_mbps", CFG_U64, CFG_OFF(wake_mbps), 0 },
     { "idle_poll_ms", CFG_I32, CFG_OFF(idle_poll_ms), 0 },
@@ -104,6 +106,7 @@ trim(char *s)
     e = s + strlen(s);
     while (e > s && isspace((unsigned char)e[-1]))
         *--e = 0;
+
     return s;
 }
 
@@ -125,6 +128,7 @@ parse_u64(const char *s, uint64_t *out)
     }
 
     *out = (uint64_t) v;
+
     return 0;
 }
 
@@ -139,6 +143,7 @@ parse_int(const char *s, int *out)
     }
 
     *out = (int) v;
+
     return 0;
 }
 
@@ -169,6 +174,7 @@ parse_csv_cidrs(char *val, struct vg_cidr *arr, int *count,
 
         tok = strtok_r(NULL, ",", &save);
     }
+
     return 0;
 }
 
@@ -202,6 +208,7 @@ parse_allow_ports(char *val, struct vg_config *c)
 
         tok = strtok_r(NULL, ",", &save);
     }
+
     return 0;
 }
 
@@ -249,6 +256,7 @@ apply_scalar(struct vg_config *c, const struct cfg_scalar *s,
         return 0;
     }
     }
+
     return -1;
 }
 
@@ -367,6 +375,7 @@ vg_config_load(const char *path, struct vg_config *c)
 fail:
     free(line);
     fclose(fp);
+
     return -1;
 }
 
@@ -423,6 +432,7 @@ local_cidr_from_nic(const char *nic, struct vg_cidr *out, int max)
     }
 
     freeifaddrs(ifa);
+
     return n;
 }
 
@@ -443,6 +453,7 @@ vg_config_auto_local(struct vg_config *c)
     }
 
     c->local_cidr_count = n;
+
     return 0;
 }
 

@@ -198,6 +198,7 @@ v4_in_lpm(void *map, __be32 ip)
 
     key.prefixlen = 32;
     __builtin_memcpy(key.data, &ip, 4);
+
     return bpf_map_lookup_elem(map, &key) != NULL;
 }
 
@@ -209,6 +210,7 @@ v6_in_lpm(void *map, const __u8 addr[16])
 
     key.prefixlen = 128;
     __builtin_memcpy(key.data, addr, 16);
+
     return bpf_map_lookup_elem(map, &key) != NULL;
 }
 
@@ -439,6 +441,7 @@ v6_walk_ext(void *data_end, void **l4p, __u8 *protop)
 
     *l4p = l4;
     *protop = proto;
+
     return 1;
 }
 
