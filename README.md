@@ -239,6 +239,14 @@ sudo t/integration/resty.sh
 from the log phase. It skips when neither `openresty` nor `nginx` is in
 `PATH`; set `NGINX` to choose the binary.
 
+## Access-log bans
+
+For plain nginx, without Lua, [`contrib/logban/`](contrib/logban/) reads
+the access log and bans clients that spend nearly all their requests on
+costly URLs (a CC flood) with the same timed drops. It replays old logs
+with `-n` to tune thresholds, and keeps a CDN's edges allowlisted. The
+design is in [`doc/logban.md`](doc/logban.md).
+
 ## How it decides
 
 - **IDLE**: XDP increments `rx_pkts` / `rx_bytes` and passes. Userspace
@@ -261,6 +269,7 @@ src/voidgate.c           daemon
 src/voidgatectl.c        voidgatectl
 lua/resty/voidgate.lua   OpenResty control client
 contrib/openresty/       example OpenResty config
+contrib/logban/          access-log bans (Python)
 src/policy.c             IDLE/ACTIVE policy
 src/maps.c               libbpf attach + LPM helpers
 ```

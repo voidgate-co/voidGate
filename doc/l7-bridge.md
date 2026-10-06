@@ -54,8 +54,10 @@ Out of scope:
 
 - **No WAF.** voidGate does not parse HTTP, match signatures or rate-limit
   requests. The gateway detects; voidGate enforces.
-- No other deciders yet (fail2ban, HAProxy, ...). Anything that can run
-  `voidgatectl drop <ip> ttl=<sec>` works, but nothing else ships (§15).
+- Other deciders are separate. Anything that can run
+  `voidgatectl drop <ip> ttl=<sec>` works; `contrib/logban/` judges the
+  access log ([logban.md](logban.md)). fail2ban and HAProxy do not ship
+  (§14, §15).
 - No persistence and no per-caller permissions (§11).
 
 The `AGENT.md` invariants still hold:

@@ -64,6 +64,7 @@ t/unit/cidr: t/unit/cidr.c src/config.o src/ipaddr.o src/log.o
 test: all
 	./t/unit/policy
 	./t/unit/cidr
+	python3 contrib/logban/test_logban.py
 	sudo t/bin/run
 
 clean:

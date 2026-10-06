@@ -10,3 +10,9 @@ t/unit/cidr
 src/bpf/voidgate.bpf.o
 src/bpf/voidgate.skel.h
 src/bpf/vmlinux.h
+# Sample logs not in the repository, see contrib/logban/data/README.md:
+# 3.5 GB, and a real log with visitors' addresses
+contrib/logban/data/kaggle.access.log
+contrib/logban/data/me.access.log
+# cdn_allow.py output
+contrib/logban/data/cdn-allow.txt
